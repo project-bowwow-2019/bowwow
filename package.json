@@ -1,0 +1,35 @@
+{
+  "name": "bowwow",
+  "version": "1.0.0",
+  "description": "project-bowwow",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "next"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/project-bowwow-2019/bowwow.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/project-bowwow-2019/bowwow/issues"
+  },
+  "homepage": "https://github.com/project-bowwow-2019/bowwow#readme",
+  "dependencies": {
+    "body-parser": "^1.18.3",
+    "express": "^4.16.4",
+    "isomorphic-fetch": "^2.2.1",
+    "log4js": "^4.0.1",
+    "next": "^7.0.2",
+    "react": "^16.7.0",
+    "react-dom": "^16.7.0",
+    "request-promise": "^4.2.2",
+    "underscore": "^1.9.1",
+    "uuid": "^3.3.2"
+  },
+  "devDependencies": {
+    "nodemon": "^1.18.9"
+  }
+}
