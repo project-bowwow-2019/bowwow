@@ -12,6 +12,9 @@ const Navigation = () => (
         <Link href="/about">
           <a style={linkStyle}>About</a>
         </Link>
+        <Link href="/chatbot">
+          <a style = {linkStyle}> Chatbot </a>
+        </Link>
     </div>
 )
 
