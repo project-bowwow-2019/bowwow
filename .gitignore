@@ -35,6 +35,10 @@ coverage
 # package-lock json
 pakage-lock.json
 
+# json files
+json
+*.json
+
 # Grunt intermediate storage (http://gruntjs.com/creating-plugins#storing-task-files)
 .grunt
 
