@@ -1,37 +1,47 @@
 import React from 'react';
-import { Chat } from 'react-chat-popup';
+import dynamic from 'next/dynamic';
+//import {Chat, addResponseMessage, addLinkSnippet, addUserMessage} from 'react-chat-popup';
+// import {Chat} from 'react-chat-popup';
+const Chat = dynamic(() => import('react-chat-popup').then(m => {
+  const {Chat} = m;
+  Chat.__webpackChunkName = m.__webpackChunkName;
+  return Chat;
+}), {ssr:false});
+
+//const chatPopup = dynamic(import('react-chat-popup'), {ssr:false});
+
+
 
 class ChatWindow extends React.Component {
 
   constructor(props){
     super(props);
     this.state = {
-      mounted:0
+      responseMessage: "Hello!"
     }
-    this.mountChat = this.mountChat.bind(this);
+    this.handleNewUserMessage = this.handleNewUserMessage.bind(this);
   }
 
-  componentDidMount(){
-    this.setState({mounted:1});
+  async componentDidMount(){
+    const chatPopup = await import('react-chat-popup')
+    this.setState({chatPopup:chatPopup})
+    chatPopup.addResponseMessage(this.state.responseMessage)
+    console.log('componentMounted')
   }
 
-  handleNewUserMessage = (newMessage) => {
-    console.log(`New message incomig! ${newMessage}`);
-    // Now send the message throught the backend API
-  }
+  handleNewUserMessage = async (newMessage) => {
+    console.log(`New message incoming! ${newMessage}`);
+    await this.props.handleUserUtterance(newMessage);
+    await this.setState({responseMessage:this.props.responseMessage})
+    //await this.setState({responseMessage:this.props.responseMessage})
 
-  mountChat(mounted){
-    if (mounted = 1){
-      return <Chat
-        handleNewUserMessage={this.handleNewUserMessage}
-      />
-    }
+    this.state.chatPopup.addResponseMessage(this.state.responseMessage)
   }
 
   render() {
     return (
       <div className="App">
-        {this.mountChat(this.state.mounted)}
+          <Chat handleNewUserMessage = {this.handleNewUserMessage}/>
       </div>
     );
   }

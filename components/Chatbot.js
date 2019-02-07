@@ -1,5 +1,6 @@
 import React from 'react';
 import uuidv4 from 'uuid/v4';
+import ChatWindow from './ChatWindow.js';
 
 class Conversation extends React.Component {
   // Conversation component is used to route all user conversation
@@ -12,15 +13,17 @@ class Conversation extends React.Component {
       userID:"",
       sessionID:"",
       userUtterance: "",
-      chatbotResponse:"hello!"
+      chatbotResponse:"Hello!",
+      serverStatus:""
     };
     this.handleSubmit = this.handleSubmit.bind(this);
     this.handleChange = this.handleChange.bind(this);
+    this.handleUserUtterance = this.handleUserUtterance.bind(this);
   };
 
   async componentDidMount () {
     this.serverLivecheck()
-      .then(res => this.setState({ response: res.status }))
+      .then(res => this.setState({ serverStatus: res.status }))
       .catch(err => console.log(err));
     await this.hydrateStateWithLocalStorage();
     if (this.state.sessionID === ""){
@@ -56,6 +59,30 @@ class Conversation extends React.Component {
       console.log(err.status);
       this.setState({chatbotResponse:err.error})
     })
+  };
+
+  handleUserUtterance (message) {
+    return new Promise(async (resolve,reject) =>{
+      console.log('in Chatbot handleUserUtterance');
+      await this.setState({userUtterance:message})
+      fetch('/chatbot/api', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(this.state)
+      })
+      .then(res => res.json())
+      .then(async data => {
+        await this.setState({chatbotResponse:data.fulfillmentText, userUtterance:""})
+        console.log(this.state)
+        resolve();
+      })
+      .catch(err => {
+        console.log(err.status);
+        this.setState({chatbotResponse:err.error})
+        reject();
+      })});
   };
 
   hydrateStateWithLocalStorage() {
@@ -98,7 +125,7 @@ class Conversation extends React.Component {
               onChange={this.handleChange}
             />
           </form>
-          <p> {this.state.sessionID}</p>
+          <ChatWindow responseMessage = {this.state.chatbotResponse} handleUserUtterance = {this.handleUserUtterance} />
         </div>
       </div>
     );
