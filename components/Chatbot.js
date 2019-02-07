@@ -12,7 +12,7 @@ class Conversation extends React.Component {
       userID:"",
       sessionID:"",
       userUtterance: "",
-      chatBotResponse:"hello!"
+      chatbotResponse:"hello!"
     };
     this.handleSubmit = this.handleSubmit.bind(this);
     this.handleChange = this.handleChange.bind(this);
@@ -38,7 +38,24 @@ class Conversation extends React.Component {
   }
 
   handleSubmit (event) {
-
+    console.log('in Chatbot handlesubmit');
+    event.preventDefault();
+    fetch('/chatbot/api', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(this.state)
+    })
+    .then(res => res.json())
+    .then(data => {
+      this.setState({chatbotResponse:data.fulfillmentText, userUtterance:""})
+      console.log(this.state)
+    })
+    .catch(err => {
+      console.log(err.status);
+      this.setState({chatbotResponse:err.error})
+    })
   };
 
   hydrateStateWithLocalStorage() {
@@ -48,17 +65,13 @@ class Conversation extends React.Component {
       if (localStorage.hasOwnProperty(key)) {
         // get the key's value from localStorage
         let value = localStorage.getItem(key);
-        console.log(value);
         // parse the localStorage string and setState
         try {
           value = JSON.parse(value);
-          console.log(value);
           this.setState({ [key]: value });
         } catch (e) {
           // handle empty string
           this.setState({ [key]: value });
-          console.log(value);
-          console.log([key])
         }
       }
     }
@@ -72,7 +85,7 @@ class Conversation extends React.Component {
     return (
       <div>
         <div id='chatbot'>
-          {this.state.chatBotResponse}
+          {this.state.chatbotResponse}
         </div>
         <div className='answer'>
           <form onSubmit={this.handleSubmit}>

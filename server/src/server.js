@@ -6,6 +6,7 @@ const next = require('next')
 const path = require('path');
 const handler = require('./controllers/handlerController')
 const livecheck = require('./routes/livecheck')
+const chatbot = require('./routes/chatbot');
 
 const dev = process.env.NODE_ENV !== 'production'
 const nextApp = next({ dev })
@@ -31,6 +32,8 @@ function createServer(){
     app.use('*', handler.requestLogging);
 
     app.use('/livecheck', livecheck.router());
+
+    app.use('/chatbot/api', chatbot.router());
 
     app.get('*', (req,res) => {
       return handle(req,res)

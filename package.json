@@ -19,7 +19,9 @@
   },
   "homepage": "https://github.com/project-bowwow-2019/bowwow#readme",
   "dependencies": {
+    "asdfjkl": "0.0.2",
     "body-parser": "^1.18.3",
+    "dialogflow": "^0.8.0",
     "express": "^4.16.4",
     "handler": "^0.1.3",
     "isomorphic-fetch": "^2.2.1",
