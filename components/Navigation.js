@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Router from 'next/router';
 import React from 'react'
 import { withStyles } from '@material-ui/core/styles';
 import AppBar from '@material-ui/core/AppBar';
@@ -7,14 +8,15 @@ import NoSsr from '@material-ui/core/NoSsr';
 import Tab from '@material-ui/core/Tab';
 import Typography from '@material-ui/core/Typography';
 
+const routes = [
+  {label:'Home',route:'/'},
+  {label:'About us',route:'/about'},
+  {label:'Chatbot',route:'/chatbot'}
+]
 
-const linkStyle = {
-  marginRight: 15
-}
 
-function LinkTab(props) {
-  return <Tab component="a" onClick={event => event.preventDefault()} {...props} />;
-}
+let newIndex = 0;
+let lastIndex ;
 
 const styles = theme => ({
   root: {
@@ -22,19 +24,6 @@ const styles = theme => ({
     backgroundColor: theme.palette.background.paper,
   },
 });
-
-class MyLink extends React.Component {
-  render() {
-    const { className, href, hrefAs, children, prefetch } = this.props
-    return (
-        <Link href={href} as={hrefAs} prefetch>
-          <a className={className}>
-            {children}
-          </a>
-        </Link>
-    )
-  }
-}
 
 class Navigation extends React.Component {
   constructor(props){
@@ -44,25 +33,37 @@ class Navigation extends React.Component {
     }
   }
 
-  handleChange =(event, value) => {
-    this.setState({value});
+  handleChange =(event, index) => {
+    lastIndex = newIndex;
+    newIndex = index;
+    Router.push(routes[index].route);
+  };
+
+  componentDidMount(){
+    if (typeof lastIndex !== "undefined"){
+      setTimeout(() => {
+        lastIndex = undefined
+        this.forceUpdate()
+      }, 0)
+    }
   }
 
   render(){
+    const index = typeof lastIndex === 'undefined'
+      ? newIndex
+      : lastIndex
     const {classes}=this.props;
     const {value}=this.state;
     return(
-      <NoSsr>
-          <div className={classes.root}>
-            <AppBar position="static">
-              <Tabs variant="fullWidth" value={value} onChange={this.handleChange}>
-                <Tab component={MyLink} href={'/'} label='Home'/>
-                <Tab component={MyLink} href={'/about'} label='About us'/>
-                <Tab component={MyLink} href={'/chatbot'} label='Chabot'/>
-              </Tabs>
-            </AppBar>
-          </div>
-        </NoSsr>
+        <div className={classes.root}>
+          <AppBar position="static">
+            <Tabs variant="fullWidth" value={index} onChange={this.handleChange}>
+              {routes.map((route, index) => (
+                <Tab key={index} label={route.label} />
+              ))}
+            </Tabs>
+          </AppBar>
+        </div>
     )
   }
 }
