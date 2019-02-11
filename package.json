@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/project-bowwow-2019/bowwow#readme",
   "dependencies": {
+    "@material-ui/core": "^3.9.2",
     "asdfjkl": "0.0.2",
     "body-parser": "^1.18.3",
     "dialogflow": "^0.8.0",
