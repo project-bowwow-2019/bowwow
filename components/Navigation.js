@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import React from 'react'
 import { withStyles } from '@material-ui/core/styles';
 import AppBar from '@material-ui/core/AppBar';
 import Tabs from '@material-ui/core/Tabs';
@@ -15,42 +16,55 @@ function LinkTab(props) {
   return <Tab component="a" onClick={event => event.preventDefault()} {...props} />;
 }
 
-const Navigation = () => (
-    //<div>
-        // <Link href="/">
-        //   <a style={linkStyle}>Home</a>
-        // </Link>
-        // <Link href="/about">
-        //   <a style={linkStyle}>About</a>
-        // </Link>
-        // <Link href="/chatbot">
-        //   <a style = {linkStyle}> Chatbot </a>
-        // </Link>
-    //</div>
+const styles = theme => ({
+  root: {
+    flexGrow: 1,
+    backgroundColor: theme.palette.background.paper,
+  },
+});
 
-    <NoSsr>
-        <div>
-          <AppBar position="static">
-            <Tabs variant="fullWidth">
-              //<Tab>
-                <Link href="/">
-                  <a style={linkStyle}>Home</a>
-                </Link>
-              //</Tab>
-              //<Tab>
-              <Link href="/about">
-                <a style={linkStyle}>About</a>
-              </Link>
-              //</Tab>
-              //<Tab>
-                <Link href="/chatbot">
-                  <a style = {linkStyle}> Chatbot </a>
-                </Link>
-              //</Tab>
-            </Tabs>
-          </AppBar>
-        </div>
-      </NoSsr>
-)
+class MyLink extends React.Component {
+  render() {
+    const { className, href, hrefAs, children, prefetch } = this.props
+    return (
+        <Link href={href} as={hrefAs} prefetch>
+          <a className={className}>
+            {children}
+          </a>
+        </Link>
+    )
+  }
+}
 
-export default Navigation
+class Navigation extends React.Component {
+  constructor(props){
+    super(props)
+    this.state ={
+      value:0
+    }
+  }
+
+  handleChange =(event, value) => {
+    this.setState({value});
+  }
+
+  render(){
+    const {classes}=this.props;
+    const {value}=this.state;
+    return(
+      <NoSsr>
+          <div className={classes.root}>
+            <AppBar position="static">
+              <Tabs variant="fullWidth" value={value} onChange={this.handleChange}>
+                <Tab component={MyLink} href={'/'} label='Home'/>
+                <Tab component={MyLink} href={'/about'} label='About us'/>
+                <Tab component={MyLink} href={'/chatbot'} label='Chabot'/>
+              </Tabs>
+            </AppBar>
+          </div>
+        </NoSsr>
+    )
+  }
+}
+
+export default withStyles(styles)(Navigation);
