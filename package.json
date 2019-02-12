@@ -31,6 +31,7 @@
     "log4js": "^4.0.1",
     "next": "latest",
     "next-images": "^1.0.4",
+    "pg": "^7.8.0",
     "prop-types": "^15.7.1",
     "react": "latest",
     "react-chat-popup": "^1.1.2",

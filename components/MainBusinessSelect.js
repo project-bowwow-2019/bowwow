@@ -6,6 +6,7 @@ import OutlinedInput from '@material-ui/core/OutlinedInput';
 import InputLabel from '@material-ui/core/InputLabel';
 import FormControl from '@material-ui/core/FormControl';
 import Select from '@material-ui/core/Select';
+import fetch from 'isomorphic-fetch'
 
 const styles = theme => ({
   root: {
@@ -41,6 +42,7 @@ class MainBusinessSelect extends React.Component {
     this.setState({ [name]: event.target.value });
   };
 
+
   render(){
     const {classes}=this.props;
 
@@ -55,9 +57,9 @@ class MainBusinessSelect extends React.Component {
               <OutlinedInput name="category" labelWidth={this.state.labelWidth} id="outlined-age-native-simple"/>
             }>
             <option value="" />
-            <option value={'restaurant'}>Restaurant</option>
-            <option value={'carRepair'}>Auto Repair</option>
-            <option value={'healthcare'}>Healthcare</option>
+            {this.props.category.map((item, index) => (
+              <option key={index} value={item.category}>{item.category}</option>
+            ))};
         </Select>
         </FormControl>
       </div>
