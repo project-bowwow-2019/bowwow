@@ -14,7 +14,7 @@ export default () => (
       <Typography variant='caption' align='center'>
         Knowing this will help us specialize the chatbot for what you need
       </Typography>
-      <MainBusinessSelect align='center'/>
+      <MainBusinessSelect/>
 
     </Layout>
 )
