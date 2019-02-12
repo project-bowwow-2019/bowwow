@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import Router from 'next/router';
+import ReactDOM from 'react-dom';
 import React from 'react'
 import { withStyles } from '@material-ui/core/styles';
 import AppBar from '@material-ui/core/AppBar';
@@ -11,7 +12,8 @@ import Typography from '@material-ui/core/Typography';
 const routes = [
   {label:'Home',route:'/'},
   {label:'About us',route:'/about'},
-  {label:'Chatbot',route:'/chatbot'}
+  {label:'Chatbot',route:'/chatbot'},
+  {label:'Create', route:'/create'}
 ]
 
 
@@ -57,7 +59,7 @@ class Navigation extends React.Component {
     return(
         <div className={classes.root}>
           <AppBar position="static">
-            <Tabs variant="fullWidth" value={index} onChange={this.handleChange}>
+            <Tabs variant="scrollable" value={index} onChange={this.handleChange}>
               {routes.map((route, index) => (
                 <Tab key={index} label={route.label} />
               ))}

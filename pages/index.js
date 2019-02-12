@@ -4,7 +4,7 @@ import Button from '@material-ui/core/Button';
 export default () => (
     <Layout>
       <p>Hello Next.js</p>
-        <Button variant = 'contained' color = 'blue'>
+        <Button variant = 'contained' color = 'primary'>
           Click Me!
         </Button>
     </Layout>
