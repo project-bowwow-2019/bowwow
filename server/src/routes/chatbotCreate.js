@@ -10,6 +10,7 @@ module.exports = {
     router.use(bodyParser.urlencoded({ extended: true }));
 
     router.get('/getCategory', chatbotCreate.getBusinessCategory);
+    router.get('/getBusinessSubtype', chatbotCreate.getBusinessSubtype);
 
     return router;
   }

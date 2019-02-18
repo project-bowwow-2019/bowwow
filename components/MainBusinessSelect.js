@@ -7,6 +7,7 @@ import InputLabel from '@material-ui/core/InputLabel';
 import FormControl from '@material-ui/core/FormControl';
 import Select from '@material-ui/core/Select';
 import fetch from 'isomorphic-fetch'
+import BusinessSubtypeSelect from './BusinessSubtypeSelect';
 
 const styles = theme => ({
   root: {
@@ -23,13 +24,20 @@ const styles = theme => ({
   },
 });
 
+function SelectSubtype(props){
+  retun
+}
+
 class MainBusinessSelect extends React.Component {
   constructor(props){
     super(props)
     this.state = {
-      mainBusiness:'',
-      labelWidth:0
+      category:'',
+      labelWidth:0,
+      subtype:[],
+      businessType:{}
     }
+    this.selectBusiness = this.selectBusiness.bind(this)
   };
 
   componentDidMount() {
@@ -38,9 +46,18 @@ class MainBusinessSelect extends React.Component {
     });
   }
 
-  handleChange = name => event => {
+  handleChange = name => async event => {
     this.setState({ [name]: event.target.value });
+    this.setState({businessType:{}})
+    const response = await fetch('http://localhost:5000/chatbotCreate/api/getBusinessSubtype?businessCategory='+ event.target.value)
+    const body = await response.json()
+    if (response.status !== 200) throw Error(body.message);
+    this.setState({subtype:body});
   };
+
+  selectBusiness(data){
+    this.setState({businessType:data});
+  }
 
 
   render(){
@@ -52,7 +69,7 @@ class MainBusinessSelect extends React.Component {
           <InputLabel ref={ref => {this.InputLabelRef = ref;}} htmlFor="outlined-age-native-simple">
             Category
           </InputLabel>
-          <Select native value={this.state.mainBusiness} onChange={this.handleChange('mainBusiness')}
+          <Select native value={this.state.category} onChange={this.handleChange('category')}
             input={
               <OutlinedInput name="category" labelWidth={this.state.labelWidth} id="outlined-age-native-simple"/>
             }>
@@ -60,8 +77,13 @@ class MainBusinessSelect extends React.Component {
             {this.props.category.map((item, index) => (
               <option key={index} value={item.category}>{item.category}</option>
             ))};
-        </Select>
+            </Select>
         </FormControl>
+        <div>
+          {this.state.subtype.length!=0 ?  (
+            <BusinessSubtypeSelect category={this.state.category} subtype={this.state.subtype} selectBusiness = {this.selectBusiness}/>
+          ): null}
+        </div>
       </div>
     )
   }
