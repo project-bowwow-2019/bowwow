@@ -6,7 +6,6 @@ import OutlinedInput from '@material-ui/core/OutlinedInput';
 import InputLabel from '@material-ui/core/InputLabel';
 import FormControl from '@material-ui/core/FormControl';
 import Select from '@material-ui/core/Select';
-import fetch from 'isomorphic-fetch'
 import BusinessSubtypeSelect from './BusinessSubtypeSelect';
 
 const styles = theme => ({
@@ -49,7 +48,7 @@ class MainBusinessSelect extends React.Component {
   handleChange = name => async event => {
     this.setState({ [name]: event.target.value });
     this.setState({businessType:{}})
-    const response = await fetch('http://localhost:5000/chatbotCreate/api/getBusinessSubtype?businessCategory='+ event.target.value)
+    const response = await fetch('/chatbotCreate/api/getBusinessSubtype?businessCategory='+ event.target.value)
     const body = await response.json()
     if (response.status !== 200) throw Error(body.message);
     this.setState({subtype:body});
