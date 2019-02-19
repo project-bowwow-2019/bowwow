@@ -3,9 +3,6 @@ import uuidv4 from 'uuid/v4';
 import ChatWindow from './ChatWindow.js';
 
 class Conversation extends React.Component {
-  // Conversation component is used to route all user conversation
-  // Its state should include the user profile and if conversation is done
-  // User profile contains relevancy list, qAskedID, attribute, currentQ, answer
 
   constructor (props) {
     super(props);

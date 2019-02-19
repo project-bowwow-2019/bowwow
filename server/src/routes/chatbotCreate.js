@@ -11,6 +11,7 @@ module.exports = {
 
     router.get('/getCategory', chatbotCreate.getBusinessCategory);
     router.get('/getBusinessSubtype', chatbotCreate.getBusinessSubtype);
+    router.get('/getCommonQuestions', chatbotCreate.getCommonQuestions)
 
     return router;
   }

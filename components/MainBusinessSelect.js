@@ -1,6 +1,5 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import PropTypes from 'prop-types';
 import { withStyles } from '@material-ui/core/styles';
 import OutlinedInput from '@material-ui/core/OutlinedInput';
 import InputLabel from '@material-ui/core/InputLabel';
@@ -25,10 +24,6 @@ const styles = theme => ({
     marginTop: theme.spacing.unit * 2,
   },
 });
-
-function SelectSubtype(props){
-  retun
-}
 
 class MainBusinessSelect extends React.Component {
   constructor(props){
@@ -70,7 +65,11 @@ class MainBusinessSelect extends React.Component {
       await this.setState({userID:id})
       localStorage.setItem("userID", id)
     }
-    this.props.handleBusinessTypeSubmit(this.state.businessType)
+    const response = await fetch('/chatbotCreate/api/getCommonQuestions?businessCategory='+this.state.businessType.category+'&businessSubtype='+this.state.businessType.subtype);
+    const body = await response.json();
+    if(response.status !==200) throw Error(body.message);
+
+    this.props.handleBusinessTypeSubmit(this.state.businessType, body, this.state.userID)
   }
 
   hydrateStateWithLocalStorage() {

@@ -1,14 +1,11 @@
 import React from 'react';
 import dynamic from 'next/dynamic';
-//import {Chat, addResponseMessage, addLinkSnippet, addUserMessage} from 'react-chat-popup';
-// import {Chat} from 'react-chat-popup';
 const Chat = dynamic(() => import('react-chat-popup').then(m => {
   const {Chat} = m;
   Chat.__webpackChunkName = m.__webpackChunkName;
   return Chat;
-}), {ssr:false});
+}), {ssr:false}); // need to import the chat component from react-chat-popup this way because it is not exported default and next.js doesn't like this type of exporting
 
-//const chatPopup = dynamic(import('react-chat-popup'), {ssr:false});
 
 
 
@@ -33,8 +30,6 @@ class ChatWindow extends React.Component {
     console.log(`New message incoming! ${newMessage}`);
     await this.props.handleUserUtterance(newMessage);
     await this.setState({responseMessage:this.props.responseMessage})
-    //await this.setState({responseMessage:this.props.responseMessage})
-
     this.state.chatPopup.addResponseMessage(this.state.responseMessage)
   }
 

@@ -32,6 +32,8 @@ exports.getBusinessCategory = function(req,res){
   .then(() => client.end());
 }
 
+//get all subtypes of the business category specified in the query.
+//query param of "businessCategory" needed in the req.auery object
 exports.getBusinessSubtype = function(req,res){
   var businessCategory = req.query.businessCategory;
   log.info('getBusinessSubtype is called with' + businessCategory)
@@ -53,4 +55,32 @@ exports.getBusinessSubtype = function(req,res){
     }
   })
   .then(() => client.end());
+}
+
+//get all common questions based on the business category and subtype
+//parameters req.query.businessCategory and req.query.businessSubtype needed
+exports.getCommonQuestions = function(req, res){
+  var businessCategory = req.query.businessCategory;
+  var businessSubtype = req.query.businessSubtype;
+
+  log.info('getCommonQeustions is called with '+ businessCategory + ' and ' + businessSubtype)
+
+  var client = new pg.Client({
+    connectionString:databaseURL
+  });
+  client.connect();
+  client.query('SELECT common_questions, intent FROM common_chats WHERE business_category=$1 AND business_subtype=$2',[businessCategory,businessSubtype])
+  .then(result=>{
+    commonQuestions = result.rows;
+    res.json(commonQuestions);
+  })
+  .catch(err=>{
+    log.info(err);
+    if (err.statusCode>=100 && err.statusCode<600) {
+      res.status(err.statusCode).json(err);
+    } else {
+      res.status(500).json(err);
+    }
+  })
+  .then(()=>client.end());
 }
