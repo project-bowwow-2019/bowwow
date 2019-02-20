@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import MainBusinessSelect from './MainBusinessSelect'
 import CommonResponses from './CommonResponses'
+import CustomQuestions from './CustomQuestions'
 
 class CreateChatbot extends React.Component{
   constructor(props){
@@ -13,8 +14,11 @@ class CreateChatbot extends React.Component{
       userResponses:{},
       customQuestions:{},
       commonQuestionsDone:false,
+      customQuestionsDone:false,
     }
-    this.handleBusinessTypeSubmit=this.handleBusinessTypeSubmit.bind(this)
+    this.handleBusinessTypeSubmit=this.handleBusinessTypeSubmit.bind(this);
+    this.handleResponseSubmit=this.handleResponseSubmit.bind(this);
+    this.handleCustomQuestionSubmit=this.handleCustomQuestionSubmit.bind(this);
   }
 
   async componentDidMount(){
@@ -29,6 +33,10 @@ class CreateChatbot extends React.Component{
     this.setState({userResponses:userResponses, commonQuestionsDone:true})
   }
 
+  handleCustomQuestionSubmit(customQuestions){
+    this.setState({customQuestions:customQuestions, customQuestionsDone:true})
+  }
+
 
   render(){
     let component;
@@ -37,6 +45,8 @@ class CreateChatbot extends React.Component{
       component = <MainBusinessSelect category={this.props.category} handleBusinessTypeSubmit={this.handleBusinessTypeSubmit} />
     } else if (Object.keys(this.state.commonQuestions).length != 0 && !this.state.commonQuestionsDone) {
       component = <CommonResponses commonQuestions={this.state.commonQuestions} handleParentHandler={this.handleResponseSubmit} businessType={this.state.businessType}/>
+    } else if (!this.state.customQuestionsDone) {
+      component = <CustomQuestions handleParentHandler={this.handleCustomQuestionSubmit} businessType={this.state.businessType}/>;
     } else {
       component = null;
     }

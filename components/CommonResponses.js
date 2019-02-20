@@ -14,7 +14,7 @@ const styles = theme => ({
   textField: {
     marginLeft: theme.spacing.unit,
     marginRight: theme.spacing.unit,
-    justifyContent:'center'
+    width:500
   }
 });
 
@@ -27,23 +27,43 @@ class CommonResponses extends React.Component{
       customQuestions:{},
       questionIndex:0,
       inputBuffer:'',
+      questionLeft:this.props.commonQuestions.length-1,
       done:false
     }
     this.handleUserSubmit=this.handleUserSubmit.bind(this);
+    this.handlePrevious=this.handlePrevious.bind(this);
   }
 
   async handleUserSubmit(){
     var tempResponses = this.state.userResponses;
     var tempIndex = this.state.questionIndex+1;
-    var responseToPush = {'intent':this.props.commonQuestions[this.state.questionIndex].intent, 'userReponse':this.state.inputBuffer}
-    tempResponses.push(responseToPush);
+    var qLeft=this.state.questionLeft-1;
+    var responseToPush = {'intent':this.props.commonQuestions[this.state.questionIndex].intent, 'userResponse':this.state.inputBuffer}
+    if(typeof tempResponses[this.state.questionIndex] === 'undefined'){
+      tempResponses.push(responseToPush);
+      this.setState({inputBuffer:''})
+    } else if (typeof tempResponses[tempIndex] === 'undefined') {
+      tempResponses[this.state.questionIndex].userResponse=this.state.inputBuffer;
+      this.setState({inputBuffer:''})
+    } else {
+      var prevInput = this.state.userResponses[tempIndex].userResponse;
+      tempResponses[this.state.questionIndex].userResponse=this.state.inputBuffer;
+      this.setState({inputBuffer:prevInput})
+    }
     await this.setState({userResponses:tempResponses})
-    if (tempIndex > this.props.commonQuestions.length){
+    if (tempIndex >= this.props.commonQuestions.length){
       this.props.handleParentHandler(this.state.userResponses)
     } else {
       this.setState({questionIndex:tempIndex});
     }
-    this.setState({inputBuffer:''})
+    this.setState({questionLeft:qLeft});
+  }
+
+  async handlePrevious(){
+    var qLeft=this.state.questionLeft+1;
+    var prevIndex = this.state.questionIndex-1;
+    var prevInput = this.state.userResponses[prevIndex].userResponse;
+    this.setState({inputBuffer:prevInput, questionIndex:prevIndex, questionLeft:qLeft})
   }
 
   handleOnChange = event =>{
@@ -69,19 +89,32 @@ class CommonResponses extends React.Component{
         <Typography variant='subtitle1' align='center'>
           Customer Question: {this.props.commonQuestions[qIndex].common_questions}
         </Typography>
-        <TextField
-          id="outlined-response-input"
-          label="Your Response"
-          className={classes.textField}
-          name="userResponse"
-          margin="normal"
-          variant="outlined"
-          value={this.state.inputBuffer}
-          onChange={this.handleOnChange}
-        />
-        <Button variant='contained' color='primary' onClick={this.handleUserSubmit}>
-          Submit!
-        </Button>
+        <form className={classes.container} noValidate autoComplete='off'>
+          <TextField
+            id="outlined-response-input"
+            label="Your Response"
+            className={classes.textField}
+            name="userResponse"
+            margin="normal"
+            variant="outlined"
+            value={this.state.inputBuffer}
+            onChange={this.handleOnChange}
+          />
+          {(this.props.commonQuestions.length-this.state.questionLeft != 1) ? (
+            <Button variant='contained' color='primary' onClick={this.handlePrevious}>
+              Previous
+            </Button>
+          ) : (null)}
+          {(this.state.questionLeft != 0)? (
+            <Button variant='contained' color='primary' onClick={this.handleUserSubmit} >
+              Next ({this.state.questionLeft} more)
+            </Button>
+          ) : (
+            <Button variant='contained' color='primary' onClick={this.handleUserSubmit} >
+              Submit!
+            </Button>
+          )}
+        </form>
       </div>
     );
   }

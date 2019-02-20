@@ -9,6 +9,7 @@ import NoSsr from '@material-ui/core/NoSsr';
 import Tab from '@material-ui/core/Tab';
 import Typography from '@material-ui/core/Typography';
 
+//need to update this when adding a new page
 const routes = [
   {label:'Home',route:'/'},
   {label:'About us',route:'/about'},
@@ -34,7 +35,7 @@ class Navigation extends React.Component {
       value:0
     }
   }
-
+  //keeps track of the index of which tab it's on. 
   handleChange =(event, index) => {
     lastIndex = newIndex;
     newIndex = index;
