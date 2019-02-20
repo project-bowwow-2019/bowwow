@@ -11,7 +11,8 @@ class CreateChatbot extends React.Component{
       userID:'',
       commonQuestions:{},
       userResponses:{},
-      userQuestions:{},
+      customQuestions:{},
+      commonQuestionsDone:false,
     }
     this.handleBusinessTypeSubmit=this.handleBusinessTypeSubmit.bind(this)
   }
@@ -24,14 +25,18 @@ class CreateChatbot extends React.Component{
     this.setState({businessType:businessType, commonQuestions:commonQuestions, userID:userID})
   }
 
+  handleResponseSubmit(userResponses){
+    this.setState({userResponses:userResponses, commonQuestionsDone:true})
+  }
+
 
   render(){
     let component;
-    
+
     if(Object.keys(this.state.businessType).length == 0){
       component = <MainBusinessSelect category={this.props.category} handleBusinessTypeSubmit={this.handleBusinessTypeSubmit} />
-    } else if (Object.keys(this.state.commonQuestions).length != 0) {
-      component = <CommonResponses commonQuestions={this.state.commonQuestions}/>
+    } else if (Object.keys(this.state.commonQuestions).length != 0 && !this.state.commonQuestionsDone) {
+      component = <CommonResponses commonQuestions={this.state.commonQuestions} handleParentHandler={this.handleResponseSubmit} businessType={this.state.businessType}/>
     } else {
       component = null;
     }
