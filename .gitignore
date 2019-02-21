@@ -8,7 +8,8 @@ __pycache__/
 .idea/
 *.iml
 
-questionPath/questions.csv
+#credential folder
+credentials
 
 # Logs
 logs
