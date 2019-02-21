@@ -34,7 +34,8 @@ class CommonResponses extends React.Component{
     this.handlePrevious=this.handlePrevious.bind(this);
   }
 
-  async handleUserSubmit(){
+  async handleUserSubmit(event){
+    event.preventDefault();
     var tempResponses = this.state.userResponses;
     var tempIndex = this.state.questionIndex+1;
     var qLeft=this.state.questionLeft-1;
@@ -59,7 +60,8 @@ class CommonResponses extends React.Component{
     this.setState({questionLeft:qLeft});
   }
 
-  async handlePrevious(){
+  async handlePrevious(event){
+    event.preventDefault()
     var qLeft=this.state.questionLeft+1;
     var prevIndex = this.state.questionIndex-1;
     var prevInput = this.state.userResponses[prevIndex].userResponse;
@@ -67,6 +69,7 @@ class CommonResponses extends React.Component{
   }
 
   handleOnChange = event =>{
+    event.preventDefault()
     var userInput = event.target.value;
     this.setState({inputBuffer:userInput});
   }
@@ -89,7 +92,7 @@ class CommonResponses extends React.Component{
         <Typography variant='subtitle1' align='center'>
           Customer Question: {this.props.commonQuestions[qIndex].common_questions}
         </Typography>
-        <form className={classes.container} noValidate autoComplete='off'>
+        <form className={classes.container} noValidate autoComplete='off' onSubmit={this.handleUserSubmit}>
           <TextField
             id="outlined-response-input"
             label="Your Response"
@@ -106,11 +109,11 @@ class CommonResponses extends React.Component{
             </Button>
           ) : (null)}
           {(this.state.questionLeft != 0)? (
-            <Button variant='contained' color='primary' onClick={this.handleUserSubmit} >
+            <Button variant='contained' color='primary' type='submit' >
               Next ({this.state.questionLeft} more)
             </Button>
           ) : (
-            <Button variant='contained' color='primary' onClick={this.handleUserSubmit} >
+            <Button variant='contained' color='primary' type='submit'>
               Submit!
             </Button>
           )}

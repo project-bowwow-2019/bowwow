@@ -32,16 +32,19 @@ class CustomQuestions extends React.Component{
   }
 
   handleQuestionOnChange = event =>{
+    event.preventDefault()
     var userInput = event.target.value;
     this.setState({questionInputBuffer:userInput});
   }
 
   handleResponseOnChange = event =>{
+    event.preventDefault()
     var userInput = event.target.value;
     this.setState({responseInputBuffer:userInput});
   }
 
   handleUserSubmit = async event => {
+    event.preventDefault()
     var tempQuestions = this.state.customQuestions;
     var tempIndex = this.state.questionIndex+1;
     var qLeft=this.state.questionLeft-1;
@@ -70,6 +73,7 @@ class CustomQuestions extends React.Component{
   }
 
   handlePrevious=async event => {
+    event.preventDefault()
     var qLeft=this.state.questionLeft+1;
     var prevIndex = this.state.questionIndex-1;
     var prevQuestion = this.state.customQuestions[prevIndex].question;
@@ -102,7 +106,7 @@ class CustomQuestions extends React.Component{
             onChange={this.handleQuestionOnChange}
           />
         </form>
-        <form className={classes.container} noValidate autoComplete='off'>
+        <form className={classes.container} noValidate autoComplete='off' onSubmit={this.handleUserSubmit}>
           <Typography variant='subtitle2' alight='center'>
             Your response:
           </Typography>
@@ -116,21 +120,21 @@ class CustomQuestions extends React.Component{
             value={this.state.responseInputBuffer}
             onChange={this.handleResponseOnChange}
           />
+          {(this.state.questionIndex!=0) ? (
+            <Button variant='contained' color='primary' onClick={this.handlePrevious}>
+              Previous
+            </Button>
+          ) : (null)}
+          {(this.state.questionLeft != 0)? (
+            <Button variant='contained' color='primary' type='submit'>
+              Next ({this.state.questionLeft} more)
+            </Button>
+          ) : (
+            <Button variant='contained' color='primary' type='submit'>
+              Submit!
+            </Button>
+          )}
         </form>
-        {(this.state.questionIndex!=0) ? (
-          <Button variant='contained' color='primary' onClick={this.handlePrevious}>
-            Previous
-          </Button>
-        ) : (null)}
-        {(this.state.questionLeft != 0)? (
-          <Button variant='contained' color='primary' onClick={this.handleUserSubmit} >
-            Next ({this.state.questionLeft} more)
-          </Button>
-        ) : (
-          <Button variant='contained' color='primary' onClick={this.handleUserSubmit} >
-            Submit!
-          </Button>
-        )}
       </div>
     )
   }

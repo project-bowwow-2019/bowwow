@@ -13,6 +13,9 @@ module.exports = {
     router.get('/getBusinessSubtype', chatbotCreate.getBusinessSubtype);
     router.get('/getCommonQuestions', chatbotCreate.getCommonQuestions)
 
+    router.use('/postUserChats', chatbotCreate.checkUserID);
+    router.use('/postUserChats', chatbotCreate.postUserChats)
+
     return router;
   }
 };

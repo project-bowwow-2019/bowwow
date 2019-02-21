@@ -33,8 +33,18 @@ class CreateChatbot extends React.Component{
     this.setState({userResponses:userResponses, commonQuestionsDone:true})
   }
 
-  handleCustomQuestionSubmit(customQuestions){
-    this.setState({customQuestions:customQuestions, customQuestionsDone:true})
+  async handleCustomQuestionSubmit(customQuestions){
+    await this.setState({customQuestions:customQuestions, customQuestionsDone:true})
+    const response = await fetch('/chatbotCreate/api/postUserChats', {
+      method: 'POST',
+      headers:{
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify(this.state)
+    })
+    const body = await response.json()
+    if (response.status !== 200) throw Error(body.message)
+    console.log(body)
   }
 
 

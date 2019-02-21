@@ -59,7 +59,8 @@ class MainBusinessSelect extends React.Component {
     this.setState({businessType:data});
   }
 
-  async handleSubmit(){
+  async handleSubmit(event){
+    event.preventDefault();
     if (this.state.userID === ''){
       var id = await uuidv4();
       await this.setState({userID:id})
@@ -108,7 +109,7 @@ class MainBusinessSelect extends React.Component {
             Knowing this will help us specialize the chatbot for what you need
           </Typography>
         </div>
-        <div className={classes.root}>
+        <form  className={classes.root} onSubmit={this.handleSubmit}>
           <FormControl variant="outlined" className={classes.formControl}>
             <InputLabel ref={ref => {this.InputLabelRef = ref;}} htmlFor="outlined-age-native-simple">
               Category
@@ -129,13 +130,13 @@ class MainBusinessSelect extends React.Component {
             ): null}
           </div>
           <div>
-            {Object.keys(this.state.businessType).length != 0 ? (
-              <Button variant='contained' color='primary' onClick={this.handleSubmit}>
-                Start!
-              </Button>): null
-            }
+              {Object.keys(this.state.businessType).length != 0 ? (
+                <Button variant='contained' color='primary' type='submit'>
+                  Start!
+                </Button>): null
+              }
           </div>
-        </div>
+        </form>
       </div>
     )
   }
