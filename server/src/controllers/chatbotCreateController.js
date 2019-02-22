@@ -127,6 +127,8 @@ exports.checkUserID = function(req,res,next){
   });
 }
 
+//posts the user submitted responses and chats to the database.
+//also inserts the user business to the database
 exports.postUserChats = async function(req, res){
   const commonIntentResponses = req.body.userResponses;
   const customQuestions = req.body.customQuestions;
@@ -170,20 +172,87 @@ exports.postUserChats = async function(req, res){
         res.status(500).json(err);
       }
     })
-
-    //insert the busines information into business_info table
-    const queryInsertInfo= 'INSERT INTO business_info(business_id, business_category, business_subtype, subscription_type, business_agent) VALUES ($1, $2, $3, $4, $5)';
-    const infoValues = [userID, businessType.category, businessType.subtype, 'trial', agentName]
-    client.query(queryInsertInfo, infoValues)
-    .then(result=>{
-      log.info('business info entered');
+    .then(()=>{
+      //insert the busines information into business_info table
+      const queryInsertInfo= 'INSERT INTO business_info(business_id, business_category, business_subtype, subscription_type, business_agent) VALUES ($1, $2, $3, $4, $5)';
+      const infoValues = [userID, businessType.category, businessType.subtype, 'trial', agentName]
+      client.query(queryInsertInfo, infoValues)
+      .then(result=>{
+        log.info('business info entered');
+      })
+      .catch(err => {
+        log.info('error at insert business info, error: ' + err);
+        if (err.statusCode>=100 && err.statusCode<600) {
+          res.status(err.statusCode).json(err);
+        } else {
+          res.status(500).json(err);
+        }
+      })
     })
-    .catch(err => {
-      log.info('error at insert business info, error: ' + err);
-      if (err.statusCode>=100 && err.statusCode<600) {
-        res.status(err.statusCode).json(err);
-      } else {
-        res.status(500).json(err);
+    .then(()=>{
+
+      //put in the custom questions into the business intent table
+      //first need to check if any of the custom questions already match an intent
+      //if the intent is matched through dialogflow, the intent and the response will be added to intent tabel
+      //if the intent is not deteced, the new question need to be added to the agent and a "random" intent
+      //name needs to be assigned to the agent, this intent name and the resopnse then go into the intent table
+      if(req.body.customQuestionsDone){
+        var dialogflowProjectId;
+        var dialogflowCredentialPath;
+
+        const queryAgentInfo = 'SELECT * FROM dialogflow_agent WHERE agent = $1';
+        const queryAgentInfoValues = [agentName];
+
+        client.query(queryAgentInfo, queryAgentInfoValues)
+        .then(result=>{
+          log.info(result.rows[0].project_id + ' is selected');
+          dialogflowProjectId=result.rows[0].project_id;
+          dialogflowCredentialPath = path.join(appRoot,result.rows[0].credential_path);
+        })
+        .catch(err=>{
+          log.info('error at query agent name, ' + err);
+          if (err.statusCode>=100 && err.statusCode<600) {
+            res.status(err.statusCode).json(err);
+          } else {
+            res.status(500).json(err);
+          }
+        })
+        .then(async ()=>{
+          console.log(dialogflowCredentialPath)
+          var valuesMatrix=[];
+          for(i=0;i<customQuestions.length;i++){
+            //send the question to dialogflow to detect the intent
+            if(customQuestions[i].question.length >= 3){
+              var intent = await detectIntent(dialogflowProjectId, dialogflowCredentialPath, userID, customQuestions[i].question);
+              if (intent.displayName=='Default Fallback Intent'){
+                let rIntentName = Math.random().toString(36).substring(7);
+                var newIntentName=await createIntent(dialogflowProjectId, dialogflowCredentialPath, rIntentName, [customQuestions[i].question],'');
+                var rowValue = [userID, rIntentName, customQuestions[i].response]
+                valuesMatrix.push(rowValue)
+              } else {
+                var rowValue = [userID, intent.displayName, customQuestions[i].response]
+                valuesMatrix.push(rowValue)
+              }
+            }
+          }
+          console.log(valuesMatrix)
+
+          //with help of the helper functions, insert multiple rows at once
+          const queryInsertIntent = `INSERT INTO business_intent_table(business_id, detected_intent, response) VALUES ${expand(valuesMatrix.length,valuesMatrix[0].length)}`;
+          const insertValues = flatten(valuesMatrix);
+          client.query(queryInsertIntent, insertValues)
+          .then(result=>{
+            log.info('custom intents entered: ' + result.rows[0]);
+          })
+          .catch(err => {
+            log.info('error at common intents insert, error: ' + err);
+            if (err.statusCode>=100 && err.statusCode<600) {
+              res.status(err.statusCode).json(err);
+            } else {
+              res.status(500).json(err);
+            }
+          })
+        })
       }
     })
 
@@ -213,42 +282,6 @@ exports.postUserChats = async function(req, res){
         }
       })
     }
-
-    //put in the custom questions into the business intent table
-    //first need to check if any of the custom questions already match an intent
-    //if the intent is matched through dialogflow, the intent and the response will be added to intent tabel
-    //if the intent is not deteced, the new question need to be added to the agent and a "random" intent
-    //name needs to be assigned to the agent, this intent name and the resopnse then go into the intent table
-    if(req.body.customQuestionsDone){
-      var dialogflowProjectId;
-      var dialogflowCredentialPath;
-
-      const queryAgentInfo = 'SELECT TOP 1 * FROM dialogflow_agent WHERE agent = $1';
-      const queryAgentInfoValues = [agentName];
-
-      client.query(queryAgentInfo, queryAgentInfoValues)
-      .then(result=>{
-        log.info(result.rows[0].project_id + ' is selected');
-        dialogflowProjectId=result.rows[0].project_id;
-        dialogflowCredentialPath = path.join(appRoot,result.rows[0].credential_path);
-        console.log(dialogflowCredentialPath)
-      })
-      .catch(err=>{
-        log.info('error at query agent name, ' + err);
-        if (err.statusCode>=100 && err.statusCode<600) {
-          res.status(err.statusCode).json(err);
-        } else {
-          res.status(500).json(err);
-        }
-      })
-
-      var valuesMatrix=[];
-      for(i=0;i<customQuestions.length;i++){
-        //send the question to dialogflow
-
-      }
-
-    }
   }
 }
 
@@ -267,12 +300,17 @@ function flatten(arr){
   return newArr
 }
 
+// detect the intent of a phrase by using dialogflow.
+// return the intent object as defined by dialogflow.
 async function detectIntent(projectId, filePath, userId, question){
+  console.log(filePath + ' in detectIntent')
   const sessionClient = new dialogflow.SessionsClient({
     projectId: projectId,
-    keyFileName: filePath
+    keyFilename: filePath
   });
   const sessionPath = sessionClient.sessionPath(projectId, userId);
+
+  console.log(sessionPath)
 
   const request = {
     session: sessionPath,
@@ -287,12 +325,69 @@ async function detectIntent(projectId, filePath, userId, question){
   const responses = await sessionClient.detectIntent(request);
   console.log('Detected Intent');
   const result = responses[0].queryResult;
-  console.log(`Query: ${result.queryText}`);
-  console.log(`Response: ${result.fulfillmentText}`);
   if(result.intent){
     console.log(` Intent: ${result.intent.displayName}`);
   } else {
     console.log('No intent matched');
   }
-  return(result.intent.displayName);
+  return(result.intent);
+}
+
+//creates a new intent
+//trainingPhraseParts needs to be an array. the parts to be annotated/labelled needs to be different than the other parts
+async function createIntent(projectId, filePath, displayName, trainingPhrasesParts, messageTexts){
+  // [START dialogflow_create_intent]
+  // Imports the Dialogflow library
+  console.log(filePath + ' in createIntent')
+  // Instantiates the Intent Client
+  const intentsClient = new dialogflow.IntentsClient({
+    projectId: projectId,
+    keyFilename: filePath
+  });
+
+  // The path to identify the agent that owns the created intent.
+  const agentPath = intentsClient.projectAgentPath(projectId);
+  console.log(agentPath)
+
+  const trainingPhrases = [];
+
+  trainingPhrasesParts.forEach(trainingPhrasesPart => {
+    const part = {
+      text: trainingPhrasesPart,
+    };
+
+
+    // Here we create a new training phrase for each provided part.
+    const trainingPhrase = {
+      type: 'EXAMPLE',
+      parts: [part],
+    };
+
+    trainingPhrases.push(trainingPhrase);
+  });
+
+  const messageText = {
+    text: messageTexts,
+  };
+
+  const message = {
+    text: messageText,
+  };
+
+  const intent = {
+    displayName: displayName,
+    trainingPhrases: trainingPhrases,
+    messages: [message],
+  };
+
+  const createIntentRequest = {
+    parent: agentPath,
+    intent: intent,
+  };
+
+  // Create the intent
+  const responses = await intentsClient.createIntent(createIntentRequest);
+  console.log(`Intent ${responses[0].name} created`);
+  return(responses[0].name)
+  // [END dialogflow_create_intent]
 }

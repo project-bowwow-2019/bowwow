@@ -35,8 +35,10 @@ class Navigation extends React.Component {
       value:0
     }
   }
-  //keeps track of the index of which tab it's on. 
+
+  //keeps track of the index of which tab it's on.
   handleChange =(event, index) => {
+    event.preventDefault();
     lastIndex = newIndex;
     newIndex = index;
     Router.push(routes[index].route);
