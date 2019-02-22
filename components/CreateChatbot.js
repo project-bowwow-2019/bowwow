@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import MainBusinessSelect from './MainBusinessSelect'
 import CommonResponses from './CommonResponses'
 import CustomQuestions from './CustomQuestions'
+import ChatApp from './ChatApp'
 
 class CreateChatbot extends React.Component{
   constructor(props){
@@ -58,7 +59,7 @@ class CreateChatbot extends React.Component{
     } else if (!this.state.customQuestionsDone) {
       component = <CustomQuestions handleParentHandler={this.handleCustomQuestionSubmit} businessType={this.state.businessType}/>;
     } else {
-      component = null;
+      component = <ChatApp userId={this.state.userID} />;
     }
 
     return(

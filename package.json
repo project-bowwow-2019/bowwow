@@ -21,6 +21,7 @@
   "dependencies": {
     "@material-ui/core": "latest",
     "@material-ui/styles": "latest",
+    "@zeit/next-css": "^1.0.1",
     "asdfjkl": "0.0.2",
     "body-parser": "^1.18.3",
     "dialogflow": "^0.8.0",
@@ -39,6 +40,7 @@
     "react-jss": "^8.6.1",
     "react-no-ssr": "^1.1.0",
     "request-promise": "^4.2.2",
+    "socket.io": "^2.2.0",
     "underscore": "^1.9.1",
     "uuid": "^3.3.2"
   },

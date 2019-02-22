@@ -147,7 +147,6 @@ exports.postUserChats = async function(req, res){
     client.connect();
 
     //find the agent the business is supposed to have
-
     var agentName;
     const querySelectAgent = 'SELECT agent FROM business_type WHERE category = $1 AND subtype = $2';
     const selectAgentValues = [businessType.category, businessType.subtype];
@@ -188,100 +187,144 @@ exports.postUserChats = async function(req, res){
           res.status(500).json(err);
         }
       })
-    })
-    .then(()=>{
+      .then(()=>{
 
-      //put in the custom questions into the business intent table
-      //first need to check if any of the custom questions already match an intent
-      //if the intent is matched through dialogflow, the intent and the response will be added to intent tabel
-      //if the intent is not deteced, the new question need to be added to the agent and a "random" intent
-      //name needs to be assigned to the agent, this intent name and the resopnse then go into the intent table
-      if(req.body.customQuestionsDone){
-        var dialogflowProjectId;
-        var dialogflowCredentialPath;
+        //put in the custom questions into the business intent table
+        //first need to check if any of the custom questions already match an intent
+        //if the intent is matched through dialogflow, the intent and the response will be added to intent tabel
+        //if the intent is not deteced, the new question and response need to be added to the undetected_intent table
+        if(req.body.customQuestionsDone){
+          var dialogflowProjectId;
+          var dialogflowCredentialPath;
 
-        const queryAgentInfo = 'SELECT * FROM dialogflow_agent WHERE agent = $1';
-        const queryAgentInfoValues = [agentName];
+          const queryAgentInfo = 'SELECT * FROM dialogflow_agent WHERE agent = $1';
+          const queryAgentInfoValues = [agentName];
 
-        client.query(queryAgentInfo, queryAgentInfoValues)
-        .then(result=>{
-          log.info(result.rows[0].project_id + ' is selected');
-          dialogflowProjectId=result.rows[0].project_id;
-          dialogflowCredentialPath = path.join(appRoot,result.rows[0].credential_path);
-        })
-        .catch(err=>{
-          log.info('error at query agent name, ' + err);
-          if (err.statusCode>=100 && err.statusCode<600) {
-            res.status(err.statusCode).json(err);
-          } else {
-            res.status(500).json(err);
-          }
-        })
-        .then(async ()=>{
-          console.log(dialogflowCredentialPath)
-          var valuesMatrix=[];
-          for(i=0;i<customQuestions.length;i++){
-            //send the question to dialogflow to detect the intent
-            if(customQuestions[i].question.length >= 3){
-              var intent = await detectIntent(dialogflowProjectId, dialogflowCredentialPath, userID, customQuestions[i].question);
-              if (intent.displayName=='Default Fallback Intent'){
-                let rIntentName = Math.random().toString(36).substring(7);
-                var newIntentName=await createIntent(dialogflowProjectId, dialogflowCredentialPath, rIntentName, [customQuestions[i].question],'');
-                var rowValue = [userID, rIntentName, customQuestions[i].response]
-                valuesMatrix.push(rowValue)
-              } else {
-                var rowValue = [userID, intent.displayName, customQuestions[i].response]
-                valuesMatrix.push(rowValue)
+          client.query(queryAgentInfo, queryAgentInfoValues)
+          .then(async result=>{
+            log.info(result.rows[0].project_id + ' is selected');
+            dialogflowProjectId=result.rows[0].project_id;
+            dialogflowCredentialPath = path.join(appRoot,result.rows[0].credential_path);
+
+            console.log(dialogflowCredentialPath)
+            var valuesMatrixIntent=[];
+            var valuesMatrixNoIntent=[];
+
+            for(i=0;i<customQuestions.length;i++){
+              //send the question to dialogflow to detect the intent
+              if(customQuestions[i].question.length >= 3){
+                var intent = await detectIntent(dialogflowProjectId, dialogflowCredentialPath, userID, customQuestions[i].question);
+                if (intent.displayName=='Default Fallback Intent'){
+                  var rowValue = [userID, customQuestions[i].question, customQuestions[i].response]
+                  valuesMatrixNoIntent.push(rowValue)
+                } else {
+                  var rowValue = [userID, intent.displayName, customQuestions[i].response]
+                  valuesMatrixIntent.push(rowValue)
+                }
               }
             }
-          }
-          console.log(valuesMatrix)
 
-          //with help of the helper functions, insert multiple rows at once
-          const queryInsertIntent = `INSERT INTO business_intent_table(business_id, detected_intent, response) VALUES ${expand(valuesMatrix.length,valuesMatrix[0].length)}`;
-          const insertValues = flatten(valuesMatrix);
-          client.query(queryInsertIntent, insertValues)
-          .then(result=>{
-            log.info('custom intents entered: ' + result.rows[0]);
+            //with help of the helper functions, insert intent detected custom questions, multiple rows at once
+            if(valuesMatrixIntent.length>0){
+              var clientIntent = new pg.Client({
+                connectionString: databaseURL
+              });
+              clientIntent.connect();
+              const queryInsertIntent = `INSERT INTO business_intent_table(business_id, detected_intent, response) VALUES ${expand(valuesMatrixIntent.length,valuesMatrixIntent[0].length)}`;
+              const valuesInsertIntent = flatten(valuesMatrixIntent);
+              clientIntent.query(queryInsertIntent, valuesInsertIntent)
+              .then(result=>{
+                log.info('custom intents entered: ' + result.rows[0]);
+              })
+              .catch(err => {
+                log.info('error at common intents insert, error: ' + err);
+                if (err.statusCode>=100 && err.statusCode<600) {
+                  res.status(err.statusCode).json(err);
+                } else {
+                  res.status(500).json(err);
+                }
+              })
+              .then(()=>{
+                clientIntent.end()
+                log.info('custom questions intents entered')
+              })
+            }
+
+            //with help of the helper functions, insert intent not detected custom questions into undetected_intent table, multiple rows at once
+            if(valuesMatrixNoIntent.length>0){
+              const queryInsertNoIntent = `INSERT INTO undetected_intent(business_id, question, response) VALUES ${expand(valuesMatrixNoIntent.length,valuesMatrixNoIntent[0].length)}`;
+              const valuesInsertNoIntent = flatten(valuesMatrixNoIntent);
+              var clientNoIntent = new pg.Client({
+                connectionString: databaseURL
+              });
+              clientNoIntent.connect();
+              clientNoIntent.query(queryInsertNoIntent, valuesInsertNoIntent)
+              .then(result=>{
+                log.info('custom intents entered: ' + result.rows[0]);
+              })
+              .catch(err => {
+                log.info('error at common intents insert, error: ' + err);
+                if (err.statusCode>=100 && err.statusCode<600) {
+                  res.status(err.statusCode).json(err);
+                } else {
+                  res.status(500).json(err);
+                }
+              })
+              .then(()=>{
+                clientNoIntent.end()
+                log.info('custom questions undetected intents entered')
+              })
+            }
+
+            //insert the common questions into business_intent_table
+            //first need to make an array of values to insert
+            if(req.body.commonQuestionsDone){
+              var valuesMatrix=[];
+              for(i=0;i<commonIntentResponses.length;i++){
+                var rowValue = [userID,commonIntentResponses[i].intent, commonIntentResponses[i].userResponse]
+                valuesMatrix.push(rowValue)
+              }
+
+              //with help of the helper functions, insert multiple rows at once
+              const queryInsertIntent = `INSERT INTO business_intent_table(business_id, detected_intent, response) VALUES ${expand(valuesMatrix.length,valuesMatrix[0].length)}`;
+              const insertValues = flatten(valuesMatrix);
+              var clientCommon = new pg.Client({
+                connectionString: databaseURL
+              });
+              clientCommon.connect();
+              clientCommon.query(queryInsertIntent, insertValues)
+              .then(result=>{
+                log.info('common intents entered: ' + result.rows[0]);
+              })
+              .catch(err => {
+                log.info('error at common intents insert, error: ' + err);
+                if (err.statusCode>=100 && err.statusCode<600) {
+                  res.status(err.statusCode).json(err);
+                } else {
+                  res.status(500).json(err);
+                }
+              })
+              .then(()=>{
+                clientCommon.end()
+                log.info('common questions intents entered')
+              })
+            }
+
           })
-          .catch(err => {
-            log.info('error at common intents insert, error: ' + err);
+          .catch(err=>{
+            log.info('error at query agent name, ' + err);
             if (err.statusCode>=100 && err.statusCode<600) {
               res.status(err.statusCode).json(err);
             } else {
               res.status(500).json(err);
             }
           })
-        })
-      }
-    })
-
-    //insert the common questions into business_intent_table
-    //first need to make an array of values to insert
-    if(req.body.commonQuestionsDone){
-      var valuesMatrix=[];
-      for(i=0;i<commonIntentResponses.length;i++){
-        var rowValue = [userID,commonIntentResponses[i].intent, commonIntentResponses[i].userResponse]
-        valuesMatrix.push(rowValue)
-      }
-      console.log(valuesMatrix)
-
-      //with help of the helper functions, insert multiple rows at once
-      const queryInsertIntent = `INSERT INTO business_intent_table(business_id, detected_intent, response) VALUES ${expand(valuesMatrix.length,valuesMatrix[0].length)}`;
-      const insertValues = flatten(valuesMatrix);
-      client.query(queryInsertIntent, insertValues)
-      .then(result=>{
-        log.info('common intents entered: ' + result.rows[0]);
-      })
-      .catch(err => {
-        log.info('error at common intents insert, error: ' + err);
-        if (err.statusCode>=100 && err.statusCode<600) {
-          res.status(err.statusCode).json(err);
-        } else {
-          res.status(500).json(err);
+          .then(()=>{
+            client.end();
+          })
         }
       })
-    }
+    })
   }
 }
 
