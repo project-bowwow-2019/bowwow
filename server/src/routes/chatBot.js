@@ -9,8 +9,13 @@ module.exports = {
     router.use('/', bodyParser.json());
     router.use(bodyParser.urlencoded({ extended: true }));
 
+    router.use('/test', chatbot.checkRequest);
+    router.use('/test', chatbot.detectIntentTest);
+
     router.use('/', chatbot.checkRequest);
-    router.use('/', chatbot.detectIntent);
+    router.use('/', chatbot.getAgent);
+    router.use('/', chatbot.getAgentCredentials);
+    router.use('/', chatbot.findResponse);
 
     return router;
   }

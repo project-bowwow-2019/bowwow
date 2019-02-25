@@ -40,7 +40,7 @@ class Conversation extends React.Component {
   handleSubmit (event) {
     console.log('in Chatbot handlesubmit');
     event.preventDefault();
-    fetch('/chatbot/api', {
+    fetch('/chatbot/api/test', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

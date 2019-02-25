@@ -4,10 +4,21 @@ const handler = require('./handlerController');
 const dialogflow = require('dialogflow');
 const asdfjkl =require('asdfjkl/lib/asdfjkl') ;
 const uuidv4 = require('uuid/v4');
+var pg = require('pg');
+const env = require('../env');
+const path = require('path');
+
+pg.defaults.ssl = true;
+
+const databaseURL = env.databaseURI;
+const appRoot = path.join(__dirname,'../../../')
 
 module.exports = {
   checkRequest,
-  detectIntent
+  findResponse,
+  getAgent,
+  detectIntentTest,
+  getAgentCredentials
 };
 
 function checkRequest(req, res, next){
@@ -40,7 +51,90 @@ function checkRequest(req, res, next){
   }
 };
 
-async function detectIntent(req, res, next){
+function getAgent(req, rex, next){
+  log.info('getAgent in Chatbot api is called')
+
+  var client = new pg.Client({
+    connectionString: databaseURL
+  });
+  client.connect();
+
+  client.query('SELECT business_agent FROM business_info WHERE business_id = $1', [req.body.userID])
+  .then(result=>{
+    const businessAgent = result.rows[0].business_agent;
+    req.body.businessAgent=businessAgent;
+    log.info('agent successfully queried with ' + req.body.businessAgent + ' selected')
+    next();
+  })
+  .catch(err=>{
+    log.info(err);
+    if (err.statusCode>=100 && err.statusCode<600) {
+      res.status(err.statusCode).json(err);
+    } else {
+      res.status(500).json(err);
+    }
+  })
+  .then(() => client.end());
+}
+
+function getAgentCredentials(req, res, next){
+  log.info('getAgentCredentials in Chatbot api is called')
+
+  var client = new pg.Client({
+    connectionString: databaseURL
+  });
+  client.connect();
+
+  client.query('SELECT * FROM dialogflow_agent WHERE agent = $1', [req.body.businessAgent])
+  .then(result=>{
+    log.info(result.rows[0].project_id + ' is selected');
+    const dialogflowProjectId=result.rows[0].project_id;
+    const dialogflowCredentialPath = path.join(appRoot,result.rows[0].credential_path);
+    req.body.dialogflowProjectId=dialogflowProjectId;
+    req.body.dialogflowCredentialPath=dialogflowCredentialPath;
+    log.info('agent credentials successfully queried with ' + req.body.dialogflowProjectId + ' selected')
+    next();
+  })
+  .catch(err=>{
+    log.info(err);
+    if (err.statusCode>=100 && err.statusCode<600) {
+      res.status(err.statusCode).json(err);
+    } else {
+      res.status(500).json(err);
+    }
+  })
+  .then(() => client.end());
+}
+
+async function findResponse(req, res, next){
+  const detectedIntent = await detectIntent(req.body.dialogflowProjectId, req.body.dialogflowCredentialPath, req.body.sessionID, req.body.userUtterance)
+
+  console.log('Intent detected: ' + detectedIntent.displayName)
+
+  var client = new pg.Client({
+    connectionString: databaseURL
+  });
+  client.connect();
+
+  const queryFindResponse = 'SELECT response FROM business_intent_table WHERE business_id = $1 AND detected_intent = $2';
+  const valueFindResponse = [req.body.userID, detectedIntent.displayName]
+  client.query(queryFindResponse, valueFindResponse)
+  .then(result=>{
+    log.info(result.rows[0].reponse + ' is selected')
+    res.json({fulfillmentText:result.rows[0].response})
+  })
+  .catch(err=>{
+    log.info(err);
+    if (err.statusCode>=100 && err.statusCode<600) {
+      res.status(err.statusCode).json(err);
+    } else {
+      res.status(500).json(err);
+    }
+  })
+  .then(() => client.end());
+}
+
+async function detectIntentTest(req, res, next){
   var projectId = 'smogshopagent-7dde1'
 
   const sessionClient = new dialogflow.SessionsClient();
@@ -68,4 +162,37 @@ async function detectIntent(req, res, next){
   }
 
   res.json(result);
+}
+
+
+
+async function detectIntent(projectId, filePath, userId, question){
+  console.log(filePath + ' in detectIntent')
+  const sessionClient = new dialogflow.SessionsClient({
+    projectId: projectId,
+    keyFilename: filePath
+  });
+  const sessionPath = sessionClient.sessionPath(projectId, userId);
+
+  console.log(sessionPath)
+
+  const request = {
+    session: sessionPath,
+    queryInput:{
+      text: {
+        text: question,
+        languageCode: 'en-US',
+      },
+    },
+  };
+
+  const responses = await sessionClient.detectIntent(request);
+  console.log('Detected Intent');
+  const result = responses[0].queryResult;
+  if(result.intent){
+    console.log(` Intent: ${result.intent.displayName}`);
+  } else {
+    console.log('No intent matched');
+  }
+  return(result.intent);
 }
