@@ -153,7 +153,7 @@ async function detectIntent(projectId, filePath, userId, question){
 }
 
 //a function to handle the cases for regular-hour intents
-async function handleRegularHour(req, queryResult){
+function handleRegularHour(req, queryResult){
   console.log('In handle regular hour')
   log.info('In handle regular hour')
   var response1
@@ -168,6 +168,7 @@ async function handleRegularHour(req, queryResult){
     const hours=result.rows;
     const hoursJson = toJsonHours(result).hoursJson;
     const hoursText = toJsonHours(result).hoursText;
+    console.log("here1")
 
     //first case is both day and time are obtained from the userUtterance
     if(queryResult.parameters.fields.date.stringValue!=="" &&queryResult.parameters.fields.time.stringValue!==""){
@@ -212,6 +213,7 @@ async function handleRegularHour(req, queryResult){
     }
     log.info(response1)
     client.end()
+    console.log(response1)
     return response1;
   })
   .catch(err=>{
