@@ -7,7 +7,7 @@ import uuidv4 from 'uuid/v4';
 class ChatAppTest extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { messages: [], sessionID:'' };
+    this.state = { messages: [], sessionID:'', userID:'' };
     this.sendHandler = this.sendHandler.bind(this);
     this.getChatbotResponse = this.getChatbotResponse.bind(this);
   }
@@ -18,11 +18,12 @@ class ChatAppTest extends React.Component {
       await this.setState({sessionID:id})
       localStorage.setItem("sessionID", id)
     }
+    this.setState({userID:'5b4429b3-e4ee-4876-8a4f-5267b7531d39'})
   }
 
   async sendHandler(message) {
     const messageObject = {
-      userId: this.props.userId,
+      userId: this.state.userID,
       message:message
     };
 
@@ -36,7 +37,7 @@ class ChatAppTest extends React.Component {
 
   getChatbotResponse(message){
     const postObject = {
-      userID:this.props.userId,
+      userID:this.state.userID,
       sessionID:this.state.sessionID,
       userUtterance:message.message,
     }
@@ -50,7 +51,7 @@ class ChatAppTest extends React.Component {
     .then(res => res.json())
     .then(data => {
       const messageObject ={
-        userId: this.props.userId,
+        userId: this.state.userId,
         message:data.fulfillmentText,
         fromMe:false,
       }

@@ -108,10 +108,15 @@ function getAgentCredentials(req, res, next){
 async function findResponse(req, res, next){
   const detectedResult = await detectIntent(req.body.dialogflowProjectId, req.body.dialogflowCredentialPath, req.body.sessionID, req.body.userUtterance)
 
-  console.log('Intent detected: ' + detectedResult.intent.displayName)
-
-  if(detectIntent.intent.displayName == 'hours-regular'){
-    handleRegularHour(req, detectedResult)
+  if(detectedResult.intent.displayName == 'hours-regular'){
+    const response = handleRegularHour(req, detectedResult)
+    console.log(response)
+    res.json({fulfillmentText:"returned texts"})
+  }else if(detectedResult.intent.displayName=='hours-holiday'){
+    const response = handleHolidayHour(req, detectedResult)
+    res.json(response)
+  }else{
+    res.json(detectedResult)
   }
 }
 
@@ -139,7 +144,8 @@ async function detectIntent(projectId, filePath, userId, question){
   console.log('Detected Intent');
   const result = responses[0].queryResult;
   if(result.intent){
-    console.log(` Intent: ${result.intent.displayName}`);
+    console.log(` Intent: ${result.intent.displayName}`)
+    console.log('result: %j', result)
   } else {
     console.log('No intent matched');
   }
@@ -148,57 +154,65 @@ async function detectIntent(projectId, filePath, userId, question){
 
 //a function to handle the cases for regular-hour intents
 async function handleRegularHour(req, queryResult){
-  let response
+  console.log('In handle regular hour')
+  log.info('In handle regular hour')
+  var response1
 
   var client = new pg.Client({
     connectionString: databaseURL
   });
   client.connect();
 
-  client.query('SELECT business_hours FROM business_info WHERE business_id = $1',[req.body.userID])
+  client.query('SELECT * FROM business_hours WHERE business_id = $1',[req.body.userID])
   .then(result=>{
-    log.info(result.rows[0] + ' is selected')
-    const hours=result.rows[0];
+    const hours=result.rows;
+    const hoursJson = toJsonHours(result).hoursJson;
+    const hoursText = toJsonHours(result).hoursText;
 
     //first case is both day and time are obtained from the userUtterance
-    if(queryResult.parameters.date!=""&&queryResult.parameters.time!=""){
-      const requestDate=new Date(queryResult.parameters.date);
+    if(queryResult.parameters.fields.date.stringValue!=="" &&queryResult.parameters.fields.time.stringValue!==""){
+      log.info('in first case')
+      const requestDate=new Date(queryResult.parameters.fields.date.stringValue);
       const requestDay=requestDate.getDay();
-      const requestTime=new Date(queryResult.parameters.time);
+      const requestTime=new Date(queryResult.parameters.fields.time.stringValue);
       const requestHour = requestTime.getHours();
       const requestMinute = requestTime.getMinutes()
-      const requestDayHours = getRegularHoursOneDay(requestDay,hours);
-      if ((requestHour+requestMinute/60)<requestDayHours.close && (requestHour+requestMinute/60)>requestDayHours.open){
-        response = {fulfillmentText:'Yes we are open at '+ requestHour + ":" + requestMinute + ' on ' + requestDay + '. Our regular hours are ' + requestDayHours.open + ' to ' + requestDayHours.close}
+      const requestDayHours = getRegularHoursOneDay(requestDay,hoursJson);
+      if(requestDayHours.closed){
+        response1 = {fulfillmentText:'Sorry we are closed on ' + requestDay}
+      }else if ((requestHour+requestMinute/60)<requestDayHours.closes[0] && (requestHour+requestMinute/60)>requestDayHours.opens[0]){
+        response1 = {fulfillmentText:'Yes we are open at '+ requestHour + ":" + requestMinute + ' on ' + requestDay}
       } else {
-        response = {fulfillmentText: 'Sorry we are closed at ' + requestHour + ":" + requestMinute + ' on ' + requestDay + '. Our regular hours are ' + requestDayHours.open + ' to ' + requestDayHours.close}
+        response1 = {fulfillmentText: 'Sorry we are closed at ' + requestHour + ":" + requestMinute + ' on ' + requestDay}
       }
-    } else if(queryResult.parameters.date!="" && queryResult.parameters.time ==''){ // second case is if only day is obtained
-      const requestDate=new Date(queryResult.parameters.date);
+    } else if(queryResult.parameters.fields.date.stringValue!=="" && queryResult.parameters.fields.time.stringValue === ""){ // second case is if only day is obtained
+      log.info('in second case')
+      const requestDate=new Date(queryResult.parameters.fields.date.stringValue);
       const requestDay=requestDate.getDay();
-      const requestDayHours = getRegularHoursOneDay(requestDay,hours);
+      const requestDayHours = getRegularHoursOneDay(requestDay,hoursJson);
       if (!requestDayHours.closed){
-        response = {fulfillmentText:'Yes we are open on ' + requestDay + '. Our regular hours are ' + requestDayHours.open + ' to ' + requestDayHours.close + ' on ' + requestDay}
+        response1 = {fulfillmentText:'Yes we are open on ' + requestDay + '. Our regular hours are ' + requestDayHours.opens[0] + ' to ' + requestDayHours.closes[0] + ' on ' + requestDay}
       } else {
-        response = {fulfillmentText: 'Sorry we are closed on ' + requestDay}
+        response1 = {fulfillmentText: 'Sorry we are closed on ' + requestDay}
       }
-    } else if(queryResult.parameters.date == '' && queryResult.parameters.time !=''){ //third case is if only time is obtained
-      const requestDate = new Date();
-      const requestDay = requestDate.getDay();
-      const requestTime=new Date(queryResult.parameters.time);
+    } else if(queryResult.parameters.fields.date.stringValue==="" && queryResult.parameters.fields.time.stringValue !== ""){ //third case is if only time is obtained
+      log.info('in third case')
+      const requestTime=new Date(queryResult.parameters.fields.time.stringValue);
+      const requestDay = requestTime.getDay()
       const requestHour = requestTime.getHours();
       const requestMinute = requestTime.getMinutes()
-      const requestDayHours = getRegularHoursOneDay(requestDay,hours);
-      if ((requestHour+requestMinute/60)<requestDayHours.close && (requestHour+requestMinute/60)>requestDayHours.open){
-        response = {fulfillmentText:'Yes we are open at '+ requestHour + ":" + requestMinute + ' today. Our regular hours are ' + requestDayHours.open + ' to ' + requestDayHours.close}
+      const requestDayHours = getRegularHoursOneDay(requestDay,hoursJson);
+      if ((requestHour+requestMinute/60)<requestDayHours.closes[0] && (requestHour+requestMinute/60)>requestDayHours.opens[0]){
+        response1 = {fulfillmentText:'Yes we are open at '+ requestHour + ":" + requestMinute + ' today. Our regular hours are ' + requestDayHours.opens[0] + ' to ' + requestDayHours.closes[0]}
       } else {
-        response = {fulfillmentText: 'Sorry we are closed at ' + requestHour + ":" + requestMinute + ' today. Our regular hours are ' + requestDayHours.open + ' to ' + requestDayHours.close}
+        response1 = {fulfillmentText: 'Sorry we are closed at ' + requestHour + ":" + requestMinute + ' today. Our regular hours are ' + requestDayHours.opens[0] + ' to ' + requestDayHours.closes[0]}
       }
     } else {
-      response = {fulfillmentText: 'Our regular hours are: /n' + hours}
+      response1 = {fulfillmentText: 'Our regular hours are: \n' + hoursText}
     }
-
-    return reponse;
+    log.info(response1)
+    client.end()
+    return response1;
   })
   .catch(err=>{
     log.info(err);
@@ -208,7 +222,9 @@ async function handleRegularHour(req, queryResult){
       res.status(500).json(err);
     }
   })
-  .then(() => client.end());
+  // .then(() => {
+  //   client.end()
+  // });
 }
 
 
@@ -233,4 +249,51 @@ function getRegularHoursOneDay(day, hours){
   } else {
     return false
   }
+}
+
+//helper function to turn the queried rows from database to a json format and a text format
+function toJsonHours(hours){
+  var hoursJson={}
+  var hoursText=''
+
+  for(i=0;i<hours.rows.length;i++){
+    if(hours.rows[i].day==0){
+      hoursJson.Sunday={opens:hours.rows[i].opens, closes:hours.rows[i].closes, closed:hours.rows[i].closed}
+      //hoursText.concat(dayHoursToString('Sunday', hours.rows[i]));
+    } else if (hours.rows[i].day==1) {
+      hoursJson.Monday={opens:hours.rows[i].opens, closes:hours.rows[i].closes, closed:hours.rows[i].closed}
+      //hoursText.concat(dayHoursToString('Monday', hours.rows[i]));
+    } else if (hours.rows[i].day==2) {
+      hoursJson.Tuesday={opens:hours.rows[i].opens, closes:hours.rows[i].closes, closed:hours.rows[i].closed}
+      //hoursText.concat(dayHoursToString('Tuesday', hours.rows[i]));
+    } else if (hours.rows[i].day==3) {
+      hoursJson.Wednesday={opens:hours.rows[i].opens, closes:hours.rows[i].closes, closed:hours.rows[i].closed}
+      //hoursText.concat(dayHoursToString('Wednesday', hours.rows[i]));
+    } else if (hours.rows[i].day==4) {
+      hoursJson.Thursday={opens:hours.rows[i].opens, closes:hours.rows[i].closes, closed:hours.rows[i].closed}
+      //hoursText.concat(dayHoursToString('Thursday', hours.rows[i]));
+    } else if (hours.rows[i].day==5) {
+      hoursJson.Friday={opens:hours.rows[i].opens, closes:hours.rows[i].closes, closed:hours.rows[i].closed}
+      //hoursText.concat(dayHoursToString('Friday', hours.rows[i]));
+    } else if (hours.rows[i].day==6) {
+      hoursJson.Saturday={opens:hours.rows[i].opens, closes:hours.rows[i].closes, closed:hours.rows[i].closed}
+      //hoursText.concat(dayHoursToString('Saturday', hours.rows[i]));
+    }
+  }
+  return {hoursJson:hoursJson, hoursText:hoursText}
+}
+
+//helper function to turn 1 day of open and close times to text. turns "closed" day to "[day]: closed"
+function dayHoursToString(day, hours){
+  var hoursText=''
+  var openHours=''
+  if(hours.closed){
+    hoursText = day + ': closed \n'
+  } else {
+    for(i=0;i<hours.opens.length;i++){
+      openHours = openHours + hours.opens[i] + ' - ' + hours.closes[i] + ', '
+    }
+    hoursText = day + openHours + ' \n'
+  }
+  return hoursText;
 }
