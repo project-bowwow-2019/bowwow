@@ -114,7 +114,7 @@ function checkHoliday (dt_date) {  // check for market holidays
 	var s_day = dt_date.getDay(); // day of the week 0-6
 	switch(s_date1){
 		case '1/1':
-		return "New Year's";
+		return "New Year";
 		case '7/4':
 		return "Independence Day";
 		case '12/25':
@@ -126,7 +126,7 @@ function checkHoliday (dt_date) {  // check for market holidays
 	if (s_day == 5){  // Friday before
 		switch(s_date1){
 			case '12/31':
-			return "New Year's";
+			return "New Year";
 			case '7/3':
 			return "Independence Day";
 			case '12/24':
@@ -136,7 +136,7 @@ function checkHoliday (dt_date) {  // check for market holidays
 	if (s_day == 1){  // Monday after
 		switch(s_date1){
 			case '1/2':
-			return "New Year's";
+			return "New Year";
 			case '7/5':
 			return "Independence Day";
 			case '12/26':
@@ -149,7 +149,7 @@ function checkHoliday (dt_date) {  // check for market holidays
 	var s_date2 = n_month + '/' + n_wnum + '/' + n_wday;
 	switch(s_date2){
 		case '1/3/1':
-		return "ML King Birthday";
+		return "Martin Luther King Birthday";
 		case '2/3/1':
 		return "President's Day";
 		case '9/1/1':

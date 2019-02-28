@@ -108,15 +108,33 @@ function getAgentCredentials(req, res, next){
 
 async function findResponse(req, res, next){
   const detectedResult = await detectIntent(req.body.dialogflowProjectId, req.body.dialogflowCredentialPath, req.body.sessionID, req.body.userUtterance)
+  const intentName = detectedResult.intent.displayName;
 
-  if(detectedResult.intent.displayName == 'hours-regular'){
-    const response = await handleRegularHour(req.body.userID, detectedResult)
-    res.json(response)
-  }else if(detectedResult.intent.displayName=='hours-holiday'){
-    const response = handleHolidayHour(req.body.userID, detectedResult)
-    res.json(response)
-  }else{
-    res.json(detectedResult)
+  switch(intentName){
+    case 'hours-regular':
+      const trueRegHour = await checkRegularHour(req.body.userID, detectedResult)
+      if(trueRegHour){
+        const response = await handleRegularHour(req.body.userID, detectedResult)
+        res.json(response)
+      } else {
+        const response = await handleHolidayHour(req.body.userID,detectedResult)
+        res.json(response)
+      }
+      break;
+    case 'hours-holiday':
+      const response = await handleHolidayHour(req.body.userID, detectedResult)
+      res.json(response)
+      break;
+    case 'location':
+      const response1 = await handleLocation(req.body.userID, detectedResult)
+      res.json(response1)
+      break;
+    case 'star-status':
+      const response2 = await handleStarStatus(req.body.userID, detectedResult)
+      res.json(response2)
+      break;
+    default:
+      res.json(detectedResult)
   }
 }
 
@@ -152,6 +170,38 @@ async function detectIntent(projectId, filePath, userId, question){
   return(result);
 }
 
+//a function that checks if the date the user asked is a holiday
+async function checkRegularHour(userID,queryResult){
+  console.log('In check regular hour')
+  log.info('In check regular hour')
+  var regularHour=true;
+
+  if(queryResult.parameters.fields.date.stringValue!==""){
+    log.info('in 1st case')
+    const requestDate=new Date(queryResult.parameters.fields.date.stringValue);
+    const holiday = businessHoursHelper.checkHoliday(requestDate);
+
+    if(!holiday){
+      return true
+    } else {
+      return false
+    }
+  } else if(queryResult.parameters.fields.date.stringValue==="" && queryResult.parameters.fields.time.stringValue !== ""){ //third case is if only time is obtained
+    log.info('in 2nd case')
+    const requestTime=new Date(queryResult.parameters.fields.time.stringValue);
+    const holiday = businessHoursHelper.checkHoliday(requestTime);
+
+    if(!holiday){
+      return true
+    } else {
+      return false
+    }
+
+  } else {
+    return true
+  }
+}
+
 //a function to handle the cases for regular-hour intents
 async function handleRegularHour(userID, queryResult){
   console.log('In handle regular hour')
@@ -163,7 +213,7 @@ async function handleRegularHour(userID, queryResult){
     connectionString: databaseURL
   });
   await client.connect();
-  const result = await client.query('SELECT * FROM business_hours WHERE business_id = $1',[userID]);
+  const result = await client.query('SELECT * FROM business_hours WHERE business_id = $1 ORDER BY day',[userID]);
   await client.end()
   const hoursJson = businessHoursHelper.toJsonHours(result).hoursJson;
   const hoursText = businessHoursHelper.toJsonHours(result).hoursText;
@@ -180,9 +230,7 @@ async function handleRegularHour(userID, queryResult){
     const holiday = businessHoursHelper.checkHoliday(requestDate);
 
     if(requestDayHours.closed){
-      response1 = {fulfillmentText:'Sorry we are closed on ' + businessHoursHelper.integerToDay(requestDay)}
-    } else if (holiday!=false){
-      response1 = await handleHolidayHour(userID,holiday)
+      response1 = {fulfillmentText:'Sorry we are closed on ' + businessHoursHelper.integerToDay(requestDay)};
     } else if ((requestHour+requestMinute/60)<requestDayHours.closes[0] && (requestHour+requestMinute/60)>requestDayHours.opens[0]){
       response1 = {fulfillmentText:'Yes we are open at '+ requestHour + ":" + requestMinute + ' on ' + businessHoursHelper.integerToDay(requestDay)}
     } else {
@@ -197,9 +245,7 @@ async function handleRegularHour(userID, queryResult){
     const holiday = businessHoursHelper.checkHoliday(requestDate);
 
     if (requestDayHours.closed){
-      response1 = {fulfillmentText: 'Sorry we are closed on ' + businessHoursHelper.integerToDay(requestDay)}
-    } else if (holiday != false) {
-      response1 = await handleHolidayHour(userID,holiday)
+      response1 = {fulfillmentText: 'Sorry we are closed on ' + businessHoursHelper.integerToDay(requestDay)};
     } else {
       response1 = {fulfillmentText:'Yes we are open on ' + businessHoursHelper.integerToDay(requestDay) + '. Our regular hours are ' + requestDayHours.opens[0] + ' to ' + requestDayHours.closes[0] + ' on ' + businessHoursHelper.integerToDay(requestDay)}
     }
@@ -214,9 +260,7 @@ async function handleRegularHour(userID, queryResult){
     const holiday = businessHoursHelper.checkHoliday(requestDate);
 
     if (requestDayHours.closed){
-      response1 = {fulfillmentText: 'Sorry we are closed today'}
-    } else if (holiday != false) {
-      response1 = await handleHolidayHour(userID,holiday)
+      response1 = {fulfillmentText: 'Sorry we are closed today'};
     } else if ((requestHour+requestMinute/60)>=requestDayHours.closes[0] && (requestHour+requestMinute/60)<requestDayHours.opens[0]){
       response1 = {fulfillmentText: 'Sorry we are closed at ' + requestHour + ":" + requestMinute + ' today. Our regular hours are ' + requestDayHours.opens[0] + ' to ' + requestDayHours.closes[0]}
     } else {
@@ -231,8 +275,99 @@ async function handleRegularHour(userID, queryResult){
   return (response1);
 }
 
+//a function to handle the cases for holiday-hour intents should not be able to get here unless the intent was holiday-hours or reg hours checked and is a holiday
+async function handleHolidayHour(userID, queryResult){
+  console.log('In handle holiday hour')
+  log.info('In handle holiday hour')
+  var response1='';
+  const now = new Date();
 
-//a function to handle the cases for holiday-hour intents
-async function handleHolidayHour(userID, holiday){
-  return ({fulfillmentText: 'handleHolidayHours function not done yet'})
+  var client = new pg.Client({
+    connectionString: databaseURL
+  });
+  await client.connect();
+
+  if (queryResult.parameters.fields.holiday === undefined){
+    if(queryResult.parameters.fields.date.stringValue!==""){
+      log.info('in 1st case')
+      const requestDate=new Date(queryResult.parameters.fields.date.stringValue);
+      const holiday = businessHoursHelper.checkHoliday(requestDate);
+      const result = await client.query('SELECT * FROM business_holiday_hours WHERE business_id = $1 AND holiday = $2',[userID, holiday]);
+      await client.end()
+
+      if (result.rows === undefined || result.rows.length ==0){
+        response1 = await handleRegularHour(userID, queryResult)
+        return({fulfillmentText:'For '+ holiday + ': ' + response1.fulfillmentText})
+      } else {
+        return({fulfillmentText:'Sorry we are closed for ' + result.rows[0].holiday})
+      }
+
+    } else if(queryResult.parameters.fields.date.stringValue==="" && queryResult.parameters.fields.time.stringValue !== ""){ //third case is if only time is obtained
+      log.info('in 2nd case')
+      const requestTime=new Date(queryResult.parameters.fields.time.stringValue);
+      const holiday = businessHoursHelper.checkHoliday(requestTime);
+      const result = await client.query('SELECT * FROM business_holiday_hours WHERE business_id = $1 AND holiday = $2',[userID, holiday]);
+      await client.end()
+
+      if (result.rows === undefined || result.rows.length ==0){
+        response1 = await handleRegularHour(userID, queryResult)
+        return('For '+ holiday + ': ' + response1.fulfillmentText)
+      } else {
+        return({fulfillmentText:'Sorry we are closed for ' + result.rows[0].holiday})
+      }
+
+    }
+  } else if (queryResult.parameters.fields.holiday != ""){
+    await client.connect();
+    const result = await client.query('SELECT * FROM business_holiday_hours WHERE business_id = $1 AND holiday = $2',[userID, queryResult.parameters.fields.holiday]);
+    await client.end()
+
+    if (result.rows === undefined || result.rows.length ==0){
+      response1 = await handleRegularHour(userID, queryResult)
+      return({fulfillmentText:'For ' + queryResult.parameters.fields.holiday + ': ' + response1.fulfillmentText})
+    } else {
+      return({fulfillmentText:'Sorry we are closed for ' + queryResult.parameters.fields.holiday})
+    }
+  } else {
+    return ({fulfillmentText: 'something went wrong in handleHolidayHour'})
+  }
+}
+
+async function handleLocation(userID, queryResult){
+  let response1={};
+  var client = new pg.Client({
+    connectionString: databaseURL
+  });
+  await client.connect();
+  const result = await client.query('SELECT business_location FROM business_info WHERE business_id = $1',[userID]);
+  await client.end()
+  if(result!==undefined || result.rows.length!=0){
+    response1 = {fulfillmentText:'We are located at ' + result.rows[0].business_location}
+    return(response1)
+  } else {
+    response1 = {fulfillmentText:"Sorry I can't help with that as I can't seem to find the location"}
+    return(response1)
+  }
+}
+
+async function handleStarStatus(userID, queryResult){
+  let response1={};
+  var client = new pg.Client({
+    connectionString: databaseURL
+  });
+  await client.connect();
+  const result = await client.query('SELECT star_cert FROM smogshop_info WHERE business_id = $1',[userID]);
+  await client.end()
+  if(result!==undefined || result.rows.length!=0){
+    if(result.rows[0].star_cert){
+      response1 = {fulfillmentText:'Yes we are a STAR certified station'}
+      return(response1)
+    } else {
+      response1 = {fulfillmentText:'No we are not a STAR certified station'}
+      return(response1)
+    }
+  } else {
+    response1 = {fulfillmentText:"Sorry I can't help with that as I don't know the STAR status of this station"}
+    return(response1)
+  }
 }
