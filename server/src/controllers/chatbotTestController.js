@@ -135,7 +135,7 @@ async function findResponse(req, res, next){
   }
 }
 
-async function detectIntent(projectId, filePath, userId, question, contexts){
+async function detectIntent(projectId, filePath, userId, question, contexts, handledContexts){
   console.log(filePath + ' in detectIntent')
   const sessionClient = new dialogflow.SessionsClient({
     projectId: projectId,
@@ -379,14 +379,15 @@ async function handleStarStatus(userID, queryResult){
 }
 
 function resetContext(currentContext,handledContextNew){
+  var contextToKeep = [];
   if(currentContext!=undefined){
     for(let i=0;i<currentContext.length;i++){
-      if (currentContext[i].name == handledContextNew){
-        currentContext[i].lifespanCount=0;
+      if (currentContext[i].name != handledContextNew){
+        contexToKeep.push(currentContext[i])
       }
     }
   }
   console.log('resetContext result: %j', currentContext )
   console.log(handledContextNew)
-  return currentContext;
+  return contextToKeep;
 }
