@@ -7,7 +7,10 @@ import uuidv4 from 'uuid/v4';
 class ChatApp extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { messages: [], sessionID:'' };
+    this.state = {
+      messages: [],
+      sessionID:'',
+    };
     this.sendHandler = this.sendHandler.bind(this);
     this.getChatbotResponse = this.getChatbotResponse.bind(this);
   }
@@ -52,6 +55,7 @@ class ChatApp extends React.Component {
       const messageObject ={
         userId: this.props.userId,
         message:data.fulfillmentText,
+        currentContext:data.outputContexts,
         fromMe:false,
       }
       this.addMessage(messageObject)

@@ -107,38 +107,35 @@ function getAgentCredentials(req, res, next){
 }
 
 async function findResponse(req, res, next){
-  const detectedResult = await detectIntent(req.body.dialogflowProjectId, req.body.dialogflowCredentialPath, req.body.sessionID, req.body.userUtterance)
+  const contextToSend = resetContext(req.body.currentContext, req.body.handledContextNew);
+  const detectedResult = await detectIntent(req.body.dialogflowProjectId, req.body.dialogflowCredentialPath, req.body.sessionID, req.body.userUtterance, contextToSend)
+  const sessionContextPath ='projects/'+req.body.dialogflowProjectId+'/agent/sessions/'+req.body.sessionID+'/contexts/';
   const intentName = detectedResult.intent.displayName;
 
-  switch(intentName){
-    case 'hours-regular':
-      const trueRegHour = await checkRegularHour(req.body.userID, detectedResult)
-      if(trueRegHour){
-        const response = await handleRegularHour(req.body.userID, detectedResult)
-        res.json(response)
-      } else {
-        const response = await handleHolidayHour(req.body.userID,detectedResult)
-        res.json(response)
-      }
-      break;
-    case 'hours-holiday':
-      const response = await handleHolidayHour(req.body.userID, detectedResult)
+  if(intentName == 'hours-regular'){
+    const trueRegHour = await checkRegularHour(req.body.userID, detectedResult)
+    if(trueRegHour){
+      const response = await handleRegularHour(req.body.userID, detectedResult)
       res.json(response)
-      break;
-    case 'location':
-      const response1 = await handleLocation(req.body.userID, detectedResult)
-      res.json(response1)
-      break;
-    case 'star-status':
-      const response2 = await handleStarStatus(req.body.userID, detectedResult)
-      res.json(response2)
-      break;
-    default:
-      res.json(detectedResult)
+    } else {
+      const response = await handleHolidayHour(req.body.userID,detectedResult)
+      res.json(response)
+    }
+  } else if (intentName == 'hours-holiday'){
+    const response = await handleHolidayHour(req.body.userID, detectedResult)
+    res.json(response)
+  } else if (intentName == 'location'){
+    const response1 = await handleLocation(req.body.userID, detectedResult,sessionContextPath)
+    res.json(response1)
+  } else if (intentName == 'star-status'){
+    const response2 = await handleStarStatus(req.body.userID, detectedResult)
+    res.json(response2)
+  } else {
+    res.json(detectedResult)
   }
 }
 
-async function detectIntent(projectId, filePath, userId, question){
+async function detectIntent(projectId, filePath, userId, question, contexts){
   console.log(filePath + ' in detectIntent')
   const sessionClient = new dialogflow.SessionsClient({
     projectId: projectId,
@@ -156,7 +153,12 @@ async function detectIntent(projectId, filePath, userId, question){
         languageCode: 'en-US',
       },
     },
+    queryParameters:{
+      contexts: contexts
+    }
   };
+
+  console.log('request: %j', request)
 
   const responses = await sessionClient.detectIntent(request);
   console.log('Detected Intent');
@@ -333,7 +335,7 @@ async function handleHolidayHour(userID, queryResult){
   }
 }
 
-async function handleLocation(userID, queryResult){
+async function handleLocation(userID, queryResult,sessionContextPath){
   let response1={};
   var client = new pg.Client({
     connectionString: databaseURL
@@ -342,10 +344,14 @@ async function handleLocation(userID, queryResult){
   const result = await client.query('SELECT business_location FROM business_info WHERE business_id = $1',[userID]);
   await client.end()
   if(result!==undefined || result.rows.length!=0){
-    response1 = {fulfillmentText:'We are located at ' + result.rows[0].business_location}
+    response1 = {
+      fulfillmentText:'We are located at ' + result.rows[0].business_location,
+      contexts:queryResult.outputContexts,
+      handledContextNew:sessionContextPath+'location'
+    }
     return(response1)
   } else {
-    response1 = {fulfillmentText:"Sorry I can't help with that as I can't seem to find the location"}
+    response1 = {fulfillmentText:"Sorry I can't help with that as I can't seem to find the location", context:queryResult.outputContexts}
     return(response1)
   }
 }
@@ -370,4 +376,17 @@ async function handleStarStatus(userID, queryResult){
     response1 = {fulfillmentText:"Sorry I can't help with that as I don't know the STAR status of this station"}
     return(response1)
   }
+}
+
+function resetContext(currentContext,handledContextNew){
+  if(currentContext!=undefined){
+    for(let i=0;i<currentContext.length;i++){
+      if (currentContext[i].name == handledContextNew){
+        currentContext[i].lifespanCount=0;
+      }
+    }
+  }
+  console.log('resetContext result: %j', currentContext )
+  console.log(handledContextNew)
+  return currentContext;
 }

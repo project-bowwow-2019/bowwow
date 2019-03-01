@@ -7,7 +7,14 @@ import uuidv4 from 'uuid/v4';
 class ChatAppTest extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { messages: [], sessionID:'', userID:'' };
+    this.state = {
+      messages: [],
+      sessionID:'',
+      userID:'',
+      currentContext:[],
+      handledContext:[],
+      handledContextNew:[],
+    };
     this.sendHandler = this.sendHandler.bind(this);
     this.getChatbotResponse = this.getChatbotResponse.bind(this);
   }
@@ -32,6 +39,7 @@ class ChatAppTest extends React.Component {
 
     messageObject.fromMe = true;
     await this.addMessage(messageObject);
+
     this.getChatbotResponse(messageObject);
   }
 
@@ -40,6 +48,9 @@ class ChatAppTest extends React.Component {
       userID:this.state.userID,
       sessionID:this.state.sessionID,
       userUtterance:message.message,
+      currentContext:this.state.currentContext,
+      handledContextNew:this.state.handledContextNew,
+      hanldedContext:this.state.handledContext,
     }
     fetch('/chatbotTest/api', {
       method: 'POST',
@@ -56,6 +67,10 @@ class ChatAppTest extends React.Component {
         fromMe:false,
       }
       this.addMessage(messageObject)
+      this.setState({currentContext:data.contexts,handledContextNew:data.handledContextNew})
+      if(data.handledContextNew != null){
+        this.state.handledContext.push(data.handledContextNew)
+      }
     })
     .catch(err => {
       console.log(err.status);
