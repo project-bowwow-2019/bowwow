@@ -14,6 +14,14 @@ class ChatAppTest extends React.Component {
       currentContext:[],
       handledContext:[],
       handledContextNew:[],
+      userInfo:{
+        prevTest:{
+          relativeLocation:'',
+          date:'',
+          dateRange:[],
+          passFail:'',
+        }
+      }
     };
     this.sendHandler = this.sendHandler.bind(this);
     this.getChatbotResponse = this.getChatbotResponse.bind(this);
@@ -51,6 +59,7 @@ class ChatAppTest extends React.Component {
       currentContext:this.state.currentContext,
       handledContextNew:this.state.handledContextNew,
       hanldedContext:this.state.handledContext,
+      userInfo:this.state.userInfo,
     }
     fetch('/chatbotTest/api', {
       method: 'POST',
@@ -67,7 +76,12 @@ class ChatAppTest extends React.Component {
         fromMe:false,
       }
       this.addMessage(messageObject)
-      this.setState({currentContext:data.contexts,handledContextNew:data.handledContextNew})
+      if(data.contexts!=null){
+        this.setState({currentContext:data.contexts});
+      }
+      if(data.handledContextNew !=null){
+        this.setState({handledContextNew:data.handledContextNew});
+      }
       if(data.handledContextNew != null){
         this.state.handledContext.push(data.handledContextNew)
       }
