@@ -8,6 +8,7 @@ var pg = require('pg');
 const env = require('../env');
 const path = require('path');
 const businessHoursHelper = require('../helpers/businessHoursHelper')
+const googleCalendar = require('../helpers/googleCalendarHelper')
 
 pg.defaults.ssl = true;
 
@@ -112,6 +113,8 @@ async function findResponse(req, res, next){
   const sessionContextPath ='projects/'+req.body.dialogflowProjectId+'/agent/sessions/'+req.body.sessionID+'/contexts/';
   const intentName = detectedResult.intent.displayName;
   const outputContexts = detectedResult.outputContexts
+  googleCalendar.listEvents2();
+
 
   if(intentName == 'hours-regular'){
     const trueRegHour = await checkRegularHour(req.body.userID, detectedResult)
