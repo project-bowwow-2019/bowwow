@@ -18,7 +18,7 @@ class ChatAppTest extends React.Component {
         prevTest:{
           relativeLocation:'',
           date:'',
-          dateRange:[],
+          dateRange:'',
           passFail:'',
         }
       }
@@ -84,6 +84,11 @@ class ChatAppTest extends React.Component {
       }
       if(data.handledContextNew != null){
         this.state.handledContext.push(data.handledContextNew)
+      }
+      if(data.prevTest != undefined){
+        const newUserInfo = this.state.userInfo;
+        newUserInfo.prevTest = data.prevTest;
+        this.setState({userInfo:newUserInfo})
       }
     })
     .catch(err => {

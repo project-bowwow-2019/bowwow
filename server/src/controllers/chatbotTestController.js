@@ -111,28 +111,32 @@ async function findResponse(req, res, next){
   const detectedResult = await detectIntent(req.body.dialogflowProjectId, req.body.dialogflowCredentialPath, req.body.sessionID, req.body.userUtterance, contextToSend)
   const sessionContextPath ='projects/'+req.body.dialogflowProjectId+'/agent/sessions/'+req.body.sessionID+'/contexts/';
   const intentName = detectedResult.intent.displayName;
+  const outputContexts = detectedResult.outputContexts
 
   if(intentName == 'hours-regular'){
     const trueRegHour = await checkRegularHour(req.body.userID, detectedResult)
     if(trueRegHour){
       const response = await handleRegularHour(req.body.userID, detectedResult)
-      res.json(response)
+      res.json(response);
     } else {
       const response = await handleHolidayHour(req.body.userID,detectedResult)
-      res.json(response)
+      res.json(response);
     }
   } else if (intentName == 'hours-holiday'){
     const response = await handleHolidayHour(req.body.userID, detectedResult)
-    res.json(response)
+    res.json(response);
   } else if (intentName == 'location'){
     const response1 = await handleLocation(req.body.userID, detectedResult, sessionContextPath, req.body.dialogflowProjectId, req.body.dialogflowCredentialPath, req.body.sessionID,)
-    res.json(response1)
+    res.json(response1);
   } else if (intentName == 'star-status'){
     const response2 = await handleStarStatus(req.body.userID, detectedResult)
-    res.json(response2)
-  } else if (intentName == 'prev-test') {
+    res.json(response2);
+  } else if (contextContains(outputContexts, sessionContextPath, 'prev-test') && intentName.includes('prev')) {
     const response3 = await handlePrevTest(req.body.userID, detectedResult, sessionContextPath, req.body.dialogflowProjectId, req.body.dialogflowCredentialPath, req.body.sessionID, req.body.userInfo)
-    res.json(response3)
+    res.json(response3);
+  } else if (intentName == 'retestPolicy'){
+    const response4 = await handleRetestPolicy(req.body.userID, detectedResult, sessionContextPath)
+    res.json(response4);
   }
   else {
     res.json(detectedResult)
@@ -191,6 +195,34 @@ async function deleteContext(projectId, filePath, sessionId, context){
   const result = await contextsClient.deleteContext(request);
   console.log(`Context ${contextPath} deleted`);
   return result;
+}
+
+async function createContext(projectId, filePath, sessionId, contextId) {
+  // [START dialogflow_create_context]
+  // Imports the Dialogflow library
+  const dialogflow = require('dialogflow');
+
+  // Instantiates clients
+  const contextsClient = new dialogflow.ContextsClient();
+
+  const sessionPath = contextsClient.sessionPath(projectId, sessionId);
+  const contextPath = contextsClient.contextPath(
+    projectId,
+    sessionId,
+    contextId
+  );
+
+  const createContextRequest = {
+    parent: sessionPath,
+    context: {
+      name: contextPath,
+      lifespanCount: 1,
+    },
+  };
+
+  const responses = await contextsClient.createContext(createContextRequest);
+  console.log(`Created ${responses[0].name} context`);
+  // [END dialogflow_create_context]
 }
 
 //a function that checks if the date the user asked is a holiday
@@ -403,6 +435,7 @@ async function handleStarStatus(userID, queryResult){
 
 async function handlePrevTest(userID, queryResult, sessionContextPath, projectId, credentialPath, sessionId, userInfo){
   //return({fulfillmentText:'not done yet'});
+
   var client = new pg.Client({
     connectionString: databaseURL
   });
@@ -410,33 +443,316 @@ async function handlePrevTest(userID, queryResult, sessionContextPath, projectId
   const result = await client.query('SELECT * FROM smogshop_service WHERE business_id = $1',[userID]);
   await client.end()
 
-  console.log(result)
+  //console.log('%j',queryResult)
 
   var relativeLocation = userInfo.prevTest.relativeLocation;
   var date = userInfo.prevTest.date;
   var dateRange = userInfo.prevTest.dateRange;
   var passFail = userInfo.prevTest.passFail;
 
-  if(result==undefined||result.rows.length==0){
-    return({fulfillmentText:"Sorry I don't know the policies regarding previous tests or visits please call"})
+  if(queryResult.intent.displayName=='prev-fail-test-here'){ // handling confirmation if the test is done here
+    if (queryResult.parameters.fields.confirmation.stringValue =='Yes'){
+      relativeLocation = 'here';
+    } else if (queryResult.parameters.fields.confirmation.stringValue == 'No'){
+      let response = {
+        fulfillmentText:"OK if you had it tested elsewhere, we won't be able to do a free retest. What can I help with today?",
+        prevTest:{
+          relativeLocation:relativeLocation,
+          date:date,
+          dateRange:dateRange,
+          passFail:passFail,
+        },
+        contexts:queryResult.outputContexts,
+        handledContextNew:sessionContextPath+'prev-test'
+      }
+      await deleteContext(projectId, credentialPath, sessionId, 'prev-test')
+      return(response)
+    }
   }
 
+  if(queryResult.intent.displayName=='prev-test-pass-fail-confirm'){ //handling confirmation if the test failed
+    if (queryResult.parameters.fields.confirmation.stringValue =='Yes'){
+      passFail = 'fail';
+    } else if (queryResult.parameters.fields.confirmation.stringValue == 'No'){
+      let response = {
+        fulfillmentText:"Good to see the test was fine. What can I help with today?",
+        prevTest:{
+          relativeLocation:relativeLocation,
+          date:date,
+          dateRange:dateRange,
+          passFail:passFail,
+        },
+        contexts:queryResult.outputContexts,
+        handledContextNew:sessionContextPath+'prev-test'
+      }
+      await deleteContext(projectId, credentialPath, sessionId, 'prev-test')
+      return(response)
+    }
+  }
+
+  //update the variables
+  relativeLocation = prevTestUpdateUserInfo(relativeLocation, date, dateRange, passFail, queryResult.parameters.fields['relative-location'], queryResult.parameters.fields.date, queryResult.parameters.fields['date-period'], queryResult.parameters.fields['pass-fail']).relativeLocation;
+  date = prevTestUpdateUserInfo(relativeLocation, date, dateRange, passFail, queryResult.parameters.fields['relative-location'], queryResult.parameters.fields.date, queryResult.parameters.fields['date-period'], queryResult.parameters.fields['pass-fail']).date;
+  dateRange= prevTestUpdateUserInfo(relativeLocation, date, dateRange, passFail, queryResult.parameters.fields['relative-location'], queryResult.parameters.fields.date, queryResult.parameters.fields['date-period'], queryResult.parameters.fields['pass-fail']).dateRange;
+  passFail = prevTestUpdateUserInfo(relativeLocation, date, dateRange, passFail, queryResult.parameters.fields['relative-location'], queryResult.parameters.fields.date, queryResult.parameters.fields['date-period'], queryResult.parameters.fields['pass-fail']).passFail;
+  console.log('location: '+relativeLocation)
+  console.log('date: '+ date)
+  console.log('dateRange: ' + dateRange)
+  console.log('passfail: ' +passFail)
+
+  //first check if there is any retest policies for the business
+  if(result==undefined||result.rows.length==0){ //no info on business having retest
+    if(relativeLocation=='here'&& passFail=='fail'){
+      let response = {
+        fulfillmentText:"Sorry I don't know the policies regarding previous tests or visits please call. What else can I help with today?",
+        prevTest:{
+          relativeLocation:relativeLocation,
+          date:date,
+          dateRange:dateRange,
+          passFail:passFail,
+        },
+        contexts:queryResult.outputContexts,
+        handledContextNew:sessionContextPath+'prev-test'
+      }
+      await deleteContext(projectId, credentialPath, sessionId, 'prev-test')
+      return(reponse)
+    } else if (passFail == 'fail'){
+      let response = {
+        fulfillmentText:"Sorry to hear your test failed, how may I help?",
+        prevTest:{
+          relativeLocation:relativeLocation,
+          date:date,
+          dateRange:dateRange,
+          passFail:passFail,
+        },
+        contexts:queryResult.outputContexts,
+      }
+      return(reponse)
+    } else {
+      let response = {
+        fulfillmentText:"Glad to hear you were here, how may I help?",
+        prevTest:{
+          relativeLocation:relativeLocation,
+          date:date,
+          dateRange:dateRange,
+          passFail:passFail,
+        },
+        contexts:queryResult.outputContexts
+      }
+      return(reponse)
+    }
+  }
+
+  //if business doesn't offer retest
   if(!result.rows[0].free_retest){
-    if(relativeLocation!=''&& queryResult.parameters.fields['relative-location'] != undefined){
-      relativeLocation = queryResult.parameters.fields['relative-location'];
+    if(relativeLocation=='here'&& passFail=='fail'){
+      let response = {
+        fulfillmentText:"Sorry it seems we do not offer free retest, how else can I help?",
+        prevTest:{
+          relativeLocation:relativeLocation,
+          date:date,
+          dateRange:dateRange,
+          passFail:passFail,
+        },
+        contexts:queryResult.outputContexts,
+        handledContextNew:sessionContextPath+'prev-test',
+      }
+      await deleteContext(projectId, credentialPath, sessionId, 'prev-test')
+      return(reponse)
+    } else if (passFail == 'fail'){
+      let response = {
+        fulfillmentText:"Sorry to hear your test failed, how may I help?",
+        prevTest:{
+          relativeLocation:relativeLocation,
+          date:date,
+          dateRange:dateRange,
+          passFail:passFail,
+        },
+        contexts:queryResult.outputContexts,
+      }
+      return(reponse)
+    } else {
+      let response = {
+        fulfillmentText:"I am glad to hear you were here, how may I help?",
+        prevTest:{
+          relativeLocation:relativeLocation,
+          date:date,
+          dateRange:dateRange,
+          passFail:passFail,
+        },
+        contexts:queryResult.outputContexts,
+      }
+      return(response)
     }
-    if(dateRange!=[] && queryResult.parameters.fields['date-period'] != undefined){
-      dateRange = queryResult.parameters.fields['date-period'];
+  } else if(result.rows[0].free_retest){ //if business does offer retest
+    console.log('in case where retest offered')
+    const today = new Date();
+    if(relativeLocation =='here'&& (date!=''||dateRange!='') && passFail=='fail'){
+      if(date!=''){ //if the date field isn't empty
+        const testDate = new Date(date);
+        console.log(today-testDate);
+        if(daysBetween(today,testDate)<result.rows[0].retest_days){ //if the test date is less than retest days
+          let response = {
+            fulfillmentText:"We can do a free retest for you. Our policy is any failed smog check completed within the last "+ result.rows[0].retest_days + ' days are eligible for a free retest so be sure to come in before then!',
+            userInfo:{
+              relativeLocation:relativeLocation,
+              date:date,
+              dateRange:dateRange,
+              passFail:passFail,
+            },
+            contexts:queryResult.outputContexts,
+            handledContextNew:sessionContextPath+'prev-test'
+          }
+          await deleteContext(projectId, credentialPath, sessionId, 'prev-test')
+          return(response)
+        } else { //if the test date is more than retest days
+          let response = {
+            fulfillmentText:"Sorry, our free retest policy is the last test must be completed within "+ result.rows[0].retest_days + ' days. How else may I help?',
+            userInfo:{
+              relativeLocation:relativeLocation,
+              date:date,
+              dateRange:dateRange,
+              passFail:passFail,
+            },
+            contexts:queryResult.outputContexts,
+            handledContextNew:sessionContextPath+'prev-test'
+          }
+          await deleteContext(projectId, credentialPath, sessionId, 'prev-test')
+          return(response)
+        }
+      } else { // datefield empty but the date range isnt empty
+        const startDay = new Date(dateRange.startDate);
+        const endDay = new Date(dateRange.endDate);
+        if(daysBetween(today,startDay)<result.rows[0].retest_days){//the earlest date in the range is less than retest days
+          let response = {
+            fulfillmentText:"We can do a free retest for you. Our policy is any failed smog check completed within the last "+ result.rows[0].retest_days + ' days are eligible for a free retest so be sure to come in before then!',
+            userInfo:{
+              relativeLocation:relativeLocation,
+              date:date,
+              dateRange:dateRange,
+              passFail:passFail,
+            },
+            contexts:queryResult.outputContexts,
+            handledContextNew:sessionContextPath+'prev-test'
+          }
+          await deleteContext(projectId, credentialPath, sessionId, 'prev-test')
+          return(response)
+        } else if(daysBetween(today,endDay)>result.rows[0].retest_days){ //the latest date in the range is more than retest days
+          let response = {
+            fulfillmentText:"Sorry, our free retest policy is the last test must be completed within "+ result.rows[0].retest_days + ' days. How else may I help?',
+            userInfo:{
+              relativeLocation:relativeLocation,
+              date:date,
+              dateRange:dateRange,
+              passFail:passFail,
+            },
+            contexts:queryResult.outputContexts,
+            handledContextNew:sessionContextPath+'prev-test'
+          }
+          await deleteContext(projectId, credentialPath, sessionId, 'prev-test')
+          return(response)
+        } else { // the retest day is somewhere in the middle of the range
+          let response = {
+            fulfillmentText:"What is the exact date of your test? ",
+            userInfo:{
+              relativeLocation:relativeLocation,
+              date:date,
+              dateRange:dateRange,
+              passFail:passFail,
+            },
+            contexts:queryResult.outputContexts,
+          }
+          await await createContext(projectId, credentialPath, sessionId, 'prev-test-date-confirm')
+          return(response)
+        }
+      }
+    } else if (relativeLocation==''){ //if location field isn't filled out
+      let response = {
+        fulfillmentText:"Did you the smog check here?",
+        prevTest:{
+          relativeLocation:relativeLocation,
+          date:date,
+          dateRange:dateRange,
+          passFail:passFail,
+        },
+        contexts:queryResult.outputContexts,
+      }
+      await createContext(projectId, credentialPath, sessionId, 'prev-test-location-confirm')
+      return(response)
+    } else if (passFail ==''){ //passFail informaion isn't filled out
+      let response = {
+        fulfillmentText:"Did the test fail?",
+        prevTest:{
+          relativeLocation:relativeLocation,
+          date:date,
+          dateRange:dateRange,
+          passFail:passFail,
+        },
+        contexts:queryResult.outputContexts,
+      }
+      await createContext(projectId, credentialPath, sessionId, 'prev-test-fail-confirm')
+      return(response)
+    } else if (date==''&& dateRange==''){ //the only other else is date and daterange are all empty
+      let response = {
+        fulfillmentText:"What is the exact date of your test? ",
+        userInfo:{
+          relativeLocation:relativeLocation,
+          date:date,
+          dateRange:dateRange,
+          passFail:passFail,
+        },
+        contexts:queryResult.outputContexts,
+      }
+      await createContext(projectId, credentialPath, sessionId, 'prev-test-date-confirm')
+      return(response)
+    } else {
+      let response = {
+        fulfillmentText:"Looks like you didn't get the last test done here. What can I help with today?",
+        userInfo:{
+          relativeLocation:relativeLocation,
+          date:date,
+          dateRange:dateRange,
+          passFail:passFail,
+        },
+        contexts:queryResult.outputContexts,
+        handledContextNew:sessionContextPath+'prev-test',
+      }
+      await deleteContext(projectId, credentialPath, sessionId, 'prev-test')
+      return(response)
     }
-    return({fulfillmentText:"I am glad to hear you were here, how may I help?"})
-  } else if(result.rows[0].free_retest){
-    if(relativeLocation!=''&& queryResult.parameters.fields['relative-location'] != undefined){
-      relativeLocation = queryResult.parameters.fields['relative-location'];
+  }
+}
+
+async function handleRetestPolicy(userID, queryResult, sessionContextPath){
+  let response1={};
+  var client = new pg.Client({
+    connectionString: databaseURL
+  });
+  await client.connect();
+  const result = await client.query('SELECT * FROM smogshop_service WHERE business_id = $1',[userID]);
+  await client.end()
+
+  //first check if there is any retest policies for the business
+  if(result==undefined||result.rows.length==0){ //no info on business having retest
+    let response = {
+      fulfillmentText:"Sorry I don't know the policies regarding previous tests or visits please call. What else can I help with today?",
+      context:queryResult.outputContexts,
     }
-    if(dateRange!=[] && queryResult.parameters.fields['date-period'] != undefined){
-      dateRange = queryResult.parameters.fields['date-period'];
+    return(response)
+  } else {
+    if(result.rows[0].free_retest){
+      let response = {
+        fulfillmentText:"We offer free retest within "+result.rows[0].retest_days + " days of the original test",
+        context:queryResult.outputContexts,
+      }
+      return(response)
+    } else {
+      let response = {
+        fulfillmentText:"Sorry we do not offer a free retest",
+        context:queryResult.outputContexts,
+      }
+      return(response)
     }
-    return({fulfillmentText:"I am glad to hear you were here, do you want a free retest?"})
   }
 }
 
@@ -445,11 +761,55 @@ function resetContext(currentContext,handledContextNew){
   if(currentContext!=undefined && handledContextNew != undefined){
     for(let i=0;i<currentContext.length;i++){
       if (currentContext[i].name != handledContextNew){
-        contexToKeep.push(currentContext[i])
+        contextToKeep.push(currentContext[i])
       }
     }
   }
   console.log('resetContext result: %j', currentContext )
   console.log(handledContextNew)
   return contextToKeep;
+}
+
+function prevTestUpdateUserInfo(relativeLocation, date, dateRange, passFail, newRelLocation, newDate, newDateRange, newPassFail){
+  if(newRelLocation!=undefined && newRelLocation.stringValue != ''){
+    relativeLocation = newRelLocation.stringValue;
+  }
+  if(newDate != undefined && newDate.stringValue != ''){
+    date = newDate.stringValue;
+  }
+  if(newDateRange != undefined && newDateRange.structValue !=undefined){
+    dateRange = {startDate:newDateRange.structValue.fields.startDate.stringValue, endDate:newDateRange.structValue.fields.endDate.stringValue};
+  }
+  if(newPassFail!=undefined && newPassFail.stringValue != ''){
+    passFail = newPassFail.stringValue;
+  }
+  return{relativeLocation:relativeLocation, date:date, dateRange:dateRange, passFail:passFail}
+}
+
+function contextContains(contexts, contextSessionPath, contextId){
+  var contains = false;
+  const contextToCheck = contextSessionPath+contextId
+  for(let i=0;i<contexts.length;i++){
+    if(contexts[i].name == contextToCheck){
+      contains = true;
+    }
+  }
+  return(contains)
+}
+
+function daysBetween(date1, date2) {
+
+    // The number of milliseconds in one day
+    var oneDay = 1000 * 60 * 60 * 24;
+
+    // Convert both dates to milliseconds
+    var date1_ms = date1.getTime();
+    var date2_ms = date2.getTime();
+
+    // Calculate the difference in milliseconds
+    var difference_ms = Math.abs(date1_ms - date2_ms);
+
+    // Convert back to days and return
+    return Math.round(difference_ms/oneDay);
+
 }
