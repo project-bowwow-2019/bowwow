@@ -17,7 +17,9 @@ const projectId = "quickstart-1551811107205";
 //const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
 
 module.exports = {
-  listEvents2
+  listCurrentAppointments,
+  listAppointmentAt,
+  insertAppointment,
 };
 
 // configure a JWT auth client
@@ -36,24 +38,38 @@ jwtClient.authorize(function (err, tokens) {
  }
 });
 
-function listEvents2(){
+function listCurrentAppointments(hours){
   let calendar = google.calendar('v3');
   calendar.events.list({
-     auth: jwtClient,
-     calendarId: 'aq3f1u8tj72ereh2b3ga3qsqao@group.calendar.google.com'
+    auth: jwtClient,
+    calendarId: 'aq3f1u8tj72ereh2b3ga3qsqao@group.calendar.google.com',
+    timeMin: (new Date()).toISOString,
+    timeMax: (new Date() + hours*60*60*1000).toISOString
   }, function (err, response) {
-     if (err) {
-         console.log('The API returned an error: ' + err);
-         return;
-     }
-     var events = response.data.items;
-     if (events.length == 0) {
-         console.log('No events found.');
-     } else {
-         console.log('Event from Google Calendar:');
-         for (let event of response.data.items) {
-             console.log('Event name: %s, Creator name: %s, Create date: %s', event.summary, event.creator.displayName, event.start.date);
-         }
-     }
+      if (err) {
+        console.log('The API returned an error: ' + err);
+        return('The API returned an error: ' + err);
+      }
+      var events = response.data.items;
+      console.log('Event from Google Calendar:');
+      for (let event of response.data.items) {
+        console.log('Event name: %s, Create date: %s', event.summary, event.start.dateTime);
+      }
+      return(events)
+    }
   });
+}
+
+function listAppointmentAt(dateTime, interval){
+  let calendar = google.calendar('v3');
+  calendar.events.list({
+    auth: jwtClient,
+    calendarId:'aq3f1u8tj72ereh2b3ga3qsqao@group.calendar.google.com',
+    timeMin:(new Date(dateTime)).toISOString,
+    timeMax:(new Date(dateTime)+interval*60*1000).toISOString,
+  }, function(err, response){
+    if (err){
+      console.log()
+    }
+  })
 }
