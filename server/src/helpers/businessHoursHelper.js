@@ -3,7 +3,8 @@ module.exports={
   toJsonHours,
   dayHoursToString,
   integerToDay,
-  checkHoliday
+  checkHoliday,
+  getDatesBetween,
 }
 
 //function to get the open and close hours of a particular day in regular hour handling. The input is integer 0-6 per javascript Date().getDay() method
@@ -196,4 +197,14 @@ function GoodFriday(Y) {  // calculates Easter Sunday and subtracts 2 days
     	M = 3;			// correct month
     	}
     return parseInt(M, 10) + '/' + parseInt(D, 10);  // return without any leading zeros
+}
+
+function getDatesBetween(startDate, stopDate) {
+    var dateArray = new Array();
+    var currentDate = startDate;
+    while (currentDate <= stopDate) {
+        dateArray.push(new Date (currentDate));
+        currentDate = currentDate.addDays(1);
+    }
+    return dateArray;
 }

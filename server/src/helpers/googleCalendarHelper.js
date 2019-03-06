@@ -51,10 +51,6 @@ function listCurrentAppointments(hours){
         return('The API returned an error: ' + err);
       }
       var events = response.data.items;
-      console.log('Event from Google Calendar:');
-      for (let event of response.data.items) {
-        console.log('Event name: %s, Create date: %s', event.summary, event.start.dateTime);
-      }
       return(events)
     }
   });
@@ -69,7 +65,25 @@ function listAppointmentAt(dateTime, interval){
     timeMax:(new Date(dateTime)+interval*60*1000).toISOString,
   }, function(err, response){
     if (err){
-      console.log()
+      console.log('The API returned an error: ' + err);
+      return('The API returned an error: ' + err);
     }
+    var events = response.data.items;
+    return(events)
+  })
+}
+
+function insertAppointmentAt(event){
+  let calendar = google.calendar('v3');
+  calendar.events.insert({
+    auth: jwtClient,
+    calendarId:'aq3f1u8tj72ereh2b3ga3qsqao@group.calendar.google.com',
+    resource: event,
+  }, function(err, response){
+    if (err){
+      console.log('The API returned an error: ' + err);
+      return('The API returned an error: ' + err);
+    }
+    console.log('Event created: %j', event)
   })
 }

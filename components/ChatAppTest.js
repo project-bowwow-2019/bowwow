@@ -20,6 +20,15 @@ class ChatAppTest extends React.Component {
           date:'',
           dateRange:'',
           passFail:'',
+        },
+        appointment:{
+          time:'',
+          date:'',
+          dateRange:'',
+        },
+        car:{
+          type:'',
+          model:''
         }
       }
     };

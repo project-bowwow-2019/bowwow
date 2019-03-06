@@ -139,6 +139,8 @@ async function findResponse(req, res, next){
   } else if (intentName == 'retestPolicy'){
     const response4 = await handleRetestPolicy(req.body.userID, detectedResult, sessionContextPath)
     res.json(response4);
+  } else if (contextContains(outputContexts, sessionPath, 'book-appointment') && intentName.includes('appointments')){
+    const response5 = await handleAppointments(req.body.userID, detectedResult, sessionContextPath, req.body.dialogflowProjectId, req.body.dialogflowCredentialPath, req.body.sessionID, req.body.userInfo)
   }
   else {
     res.json(detectedResult)
@@ -324,7 +326,11 @@ async function handleRegularHour(userID, queryResult){
       response1 = {fulfillmentText:'Yes we are open at '+ requestHour + ":" + requestMinute + ' today. Our regular hours are ' + requestDayHours.opens[0] + ' to ' + requestDayHours.closes[0]}
     }
 
-  } else {
+  } else if(queryResult.parameters.fields['date-period'].structValue != undefined){
+    let datePeriod = {startDate:new Date(queryResult.parameters.fields['date-period'].structValue.fields.startDate.stringValue), endDate:new Date(queryResult.parameters.fields['date-period'].structValue.fields.endDate.stringValue)}
+    dateArray = businessHoursHelper.getDatesBetween(datePeriod.startDate, datePeriod.endDate);
+    
+  } else{
     response1 = {fulfillmentText: 'Our regular hours are: \n' + hoursText}
   }
   log.info(response1)
@@ -758,6 +764,18 @@ async function handleRetestPolicy(userID, queryResult, sessionContextPath){
   }
 }
 
+async function handleAppointments(userID, queryResult, sessionContextPath, projectId, credentialPath, sessionId, userInfo){
+  var time = userInfo.appointment.time;
+  var date = userInfo.appointment.date;
+  var dateRange = userInfo.appointment.dateRange;
+
+  time = appointmentUpdateUserInfo(time, date, dateRange, queryResult.parameters.fields.time, queryResult.parameters.fields.date, queryResults.parameters.fields['date-period']).time;
+  date = appointmentUpdateUserInfo(time, date, dateRange, queryResult.parameters.fields.time, queryResult.parameters.fields.date, queryResults.parameters.fields['date-period']).date;
+  dateRange = appointmentUpdateUserInfo(time, date, dateRange, queryResult.parameters.fields.time, queryResult.parameters.fields.date, queryResults.parameters.fields['date-period']).dateRange;
+
+
+}
+
 function resetContext(currentContext,handledContextNew){
   var contextToKeep = [];
   if(currentContext!=undefined && handledContextNew != undefined){
@@ -786,6 +804,19 @@ function prevTestUpdateUserInfo(relativeLocation, date, dateRange, passFail, new
     passFail = newPassFail.stringValue;
   }
   return{relativeLocation:relativeLocation, date:date, dateRange:dateRange, passFail:passFail}
+}
+
+function appointmentUpdateUserInfo(time, date, dateRange, newTime, newDate, newDateRange){
+  if(newTime != undefined && newTime.stringValue !=''){
+    time = newTime.stringValue;
+  }
+  if(newDate != undefined && newDate.stringValue !=''){
+    date = newDate.stringValue;
+  }
+  if(newDateRage != undefined && newDateRange.structValue != undefined){
+    dateRange = {startDate:newDateRange.structValue.fields.startDate.stringValue, endDate:newDateRange.structValue.fields.endDate.stringValue};
+  }
+  return{time:time, date:date, dateRange:dateRange}
 }
 
 function contextContains(contexts, contextSessionPath, contextId){
