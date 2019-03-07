@@ -813,20 +813,46 @@ async function handleAppointments(userID, queryResult, sessionContextPath, proje
   var time = userInfo.appointment.time;
   var date = userInfo.appointment.date;
   var dateRange = userInfo.appointment.dateRange;
+  let response;
 
   time = appointmentUpdateUserInfo(time, date, dateRange, queryResult.parameters.fields.time, queryResult.parameters.fields.date, queryResult.parameters.fields['date-period']).time;
   date = appointmentUpdateUserInfo(time, date, dateRange, queryResult.parameters.fields.time, queryResult.parameters.fields.date, queryResult.parameters.fields['date-period']).date;
   dateRange = appointmentUpdateUserInfo(time, date, dateRange, queryResult.parameters.fields.time, queryResult.parameters.fields.date, queryResult.parameters.fields['date-period']).dateRange;
 
-  let response = {
-    fulfillmentText:"Appointment handling not done yet",
-    contexts:queryResult.outputContexts,
-    appointment:{
-      time:time,
-      date:date,
-      dateRange:dateRange,
-    },
+  if(time=='' && date ==''){
+    await createContext(projectId, credentialPath, sessionId, 'book-appointment-time');
+    response = {
+      fulfillmentText:'Which date and time would you like the reservation?',
+      context:queryResult.outputContexts,
+      appointment:{
+        time:time,
+        date:date,
+        dateRange:dateRange,
+      }
+    }
+  } else if (time ==''){
+    await createContext(projectId, credentialPath, sessionId, 'book-appointment-time');
+    response = {
+      fulfillmentText:'What time on would you like to book?',
+      context:queryResult.outputContexts,
+      appointment:{
+        time:time,
+        date:date,
+        dateRange:dateRange,
+      }
+    }
+  } else {
+    response = {
+      fulfillmentText:"Appointment handling not done yet",
+      contexts:queryResult.outputContexts,
+      appointment:{
+        time:time,
+        date:date,
+        dateRange:dateRange,
+      },
+    }
   }
+
   return(response)
 }
 
