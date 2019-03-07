@@ -28,7 +28,8 @@ class ChatAppTest extends React.Component {
         },
         car:{
           type:'',
-          model:''
+          model:'',
+          year:''
         }
       }
     };
@@ -95,8 +96,13 @@ class ChatAppTest extends React.Component {
         this.state.handledContext.push(data.handledContextNew)
       }
       if(data.prevTest != undefined){
-        const newUserInfo = this.state.userInfo;
+        let newUserInfo = this.state.userInfo;
         newUserInfo.prevTest = data.prevTest;
+        this.setState({userInfo:newUserInfo})
+      }
+      if(data.appointment != undefined){
+        let newUserInfo = this.state.userInfo;
+        newUserInfo.appointment = data.appointment;
         this.setState({userInfo:newUserInfo})
       }
     })

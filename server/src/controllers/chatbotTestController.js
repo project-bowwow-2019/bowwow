@@ -141,6 +141,7 @@ async function findResponse(req, res, next){
     res.json(response4);
   } else if (contextContains(outputContexts, sessionContextPath, 'book-appointment') && intentName.includes('appointments')){
     const response5 = await handleAppointments(req.body.userID, detectedResult, sessionContextPath, req.body.dialogflowProjectId, req.body.dialogflowCredentialPath, req.body.sessionID, req.body.userInfo)
+    res.json(response5);
   }
   else {
     res.json(detectedResult)
@@ -236,7 +237,6 @@ async function checkRegularHour(userID,queryResult){
   var regularHour=true;
 
   if(queryResult.parameters.fields.date.stringValue!==""){
-    log.info('in 1st case')
     const requestDate=new Date(queryResult.parameters.fields.date.stringValue);
     const holiday = businessHoursHelper.checkHoliday(requestDate);
 
@@ -245,8 +245,7 @@ async function checkRegularHour(userID,queryResult){
     } else {
       return false
     }
-  } else if(queryResult.parameters.fields.date.stringValue==="" && queryResult.parameters.fields.time.stringValue !== ""){ //third case is if only time is obtained
-    log.info('in 2nd case')
+  } else if(queryResult.parameters.fields.date.stringValue==="" && queryResult.parameters.fields.time.stringValue !== ""){
     const requestTime=new Date(queryResult.parameters.fields.time.stringValue);
     const holiday = businessHoursHelper.checkHoliday(requestTime);
 
@@ -279,29 +278,32 @@ async function handleRegularHour(userID, queryResult){
 
   //first case is both day and time are obtained from the userUtterance
   if(queryResult.parameters.fields.date.stringValue!=="" &&queryResult.parameters.fields.time.stringValue!==""){
-    log.info('in first case')
+    console.log('in first case')
     const requestDate=new Date(queryResult.parameters.fields.date.stringValue);
     const requestDay=requestDate.getDay();
     const requestTime=new Date(queryResult.parameters.fields.time.stringValue);
     const requestHour = requestTime.getHours();
     const requestMinute = requestTime.getMinutes()
     const requestDayHours =  businessHoursHelper.getRegularHoursOneDay(requestDay,hoursJson);
-    const holiday = businessHoursHelper.checkHoliday(requestDate);
+
+    const openingHour = parseInt(requestDayHours.opens[0].substring(0,2),10);
+    const openingMinute = parseInt(requestDayHours.opens[0].substring(3,5),10)
+    const closingHour = parseInt(requestDayHours.closes[0].substring(0,2),10);
+    const closingMinute = parseInt(requestDayHours.closes[0].substring(3,5),10)
 
     if(requestDayHours.closed){
       response1 = {fulfillmentText:'Sorry we are closed on ' + businessHoursHelper.integerToDay(requestDay)};
-    } else if ((requestHour+requestMinute/60)<requestDayHours.closes[0] && (requestHour+requestMinute/60)>requestDayHours.opens[0]){
+    } else if ((requestHour+requestMinute/60)<(closingHour+closingMinute/60) && (requestHour+requestMinute/60)>(openingHour+openingMinute/60)){
       response1 = {fulfillmentText:'Yes we are open at '+ requestHour + ":" + requestMinute + ' on ' + businessHoursHelper.integerToDay(requestDay)}
     } else {
       response1 = {fulfillmentText: 'Sorry we are closed at ' + requestHour + ":" + requestMinute + ' on ' + businessHoursHelper.integerToDay(requestDay)}
     }
 
   } else if(queryResult.parameters.fields.date.stringValue!=="" && queryResult.parameters.fields.time.stringValue === ""){ // second case is if only day is obtained
-    log.info('in second case')
+    console.log('in second case')
     const requestDate=new Date(queryResult.parameters.fields.date.stringValue);
     const requestDay=requestDate.getDay();
     const requestDayHours = businessHoursHelper.getRegularHoursOneDay(requestDay,hoursJson);
-    const holiday = businessHoursHelper.checkHoliday(requestDate);
 
     if (requestDayHours.closed){
       response1 = {fulfillmentText: 'Sorry we are closed on ' + businessHoursHelper.integerToDay(requestDay)};
@@ -310,7 +312,7 @@ async function handleRegularHour(userID, queryResult){
     }
 
   } else if(queryResult.parameters.fields.date.stringValue==="" && queryResult.parameters.fields.time.stringValue !== ""){ //third case is if only time is obtained
-    log.info('in third case')
+    console.log('in third case')
     const requestTime=new Date(queryResult.parameters.fields.time.stringValue);
     const requestDay = requestTime.getDay()
     const requestHour = requestTime.getHours();
@@ -318,21 +320,60 @@ async function handleRegularHour(userID, queryResult){
     const requestDayHours = businessHoursHelper.getRegularHoursOneDay(requestDay,hoursJson);
     const holiday = businessHoursHelper.checkHoliday(requestTime);
 
+    const openingHour = parseInt(requestDayHours.opens[0].substring(0,2),10);
+    const openingMinute = parseInt(requestDayHours.opens[0].substring(3,5),10)
+    const closingHour = parseInt(requestDayHours.closes[0].substring(0,2),10);
+    const closingMinute = parseInt(requestDayHours.closes[0].substring(3,5),10);
+
     if (requestDayHours.closed){
       response1 = {fulfillmentText: 'Sorry we are closed today'};
-    } else if ((requestHour+requestMinute/60)>=requestDayHours.closes[0] && (requestHour+requestMinute/60)<requestDayHours.opens[0]){
+    } else if ((requestHour+requestMinute/60)>=(closingHour+closingMinute/60) || (requestHour+requestMinute/60)<(openingHour+openingMinute/60)){
       response1 = {fulfillmentText: 'Sorry we are closed at ' + requestHour + ":" + requestMinute + ' today. Our regular hours are ' + requestDayHours.opens[0] + ' to ' + requestDayHours.closes[0]}
     } else {
       response1 = {fulfillmentText:'Yes we are open at '+ requestHour + ":" + requestMinute + ' today. Our regular hours are ' + requestDayHours.opens[0] + ' to ' + requestDayHours.closes[0]}
     }
 
   } else if(queryResult.parameters.fields['date-period'].structValue != undefined){
+    console.log('in fourth case')
     let datePeriod = {startDate:new Date(queryResult.parameters.fields['date-period'].structValue.fields.startDate.stringValue), endDate:new Date(queryResult.parameters.fields['date-period'].structValue.fields.endDate.stringValue)}
     dateArray = businessHoursHelper.getDatesBetween(datePeriod.startDate, datePeriod.endDate);
-    let openDays = [];
-    let closedDays = [];
-    for(i=0;i<dateArray.length;i++){
-
+    if(dateArray.length<=7){
+      let openDays = [];
+      let closedDays = [];
+      dateArray.map(date1=>{
+        var requestDay = date1.getDay()
+        var requestDayHours = businessHoursHelper.getRegularHoursOneDay(requestDay, hoursJson);
+        if (requestDayHours.closed){
+          closedDays.push(businessHoursHelper.integerToDay(requestDay))
+        }else {
+          openDays.push(businessHoursHelper.integerToDay(requestDay))
+        }
+      })
+      var openText
+      var closedText
+      if (openDays.length>0){
+        openText = 'We are open on ';
+        openDays.map((openDay, i)=>{
+          if(openDays.length== i+1){
+            openText = openText + openDay + '. '
+          } else {
+            openText = openText + openDay + ', '
+          }
+        });
+      }
+      if(closedDays.length>0){
+        closedText = 'We are closed on ';
+        closedDays.map((closedDay, i) =>{
+          if(closedDays.length == i+1 ){
+            closedText = closedText + closedDay + '. '
+          } else {
+            closedText = closedText + closedDay + ', '
+          }
+        });
+      }
+      response1 = {fulfillmentText: openText + closedText}
+    } else{
+      response1 = {fulfillmentText: 'Which day would you like to know?'}
     }
   } else{
     response1 = {fulfillmentText: 'Our regular hours are: \n' + hoursText}
@@ -606,7 +647,7 @@ async function handlePrevTest(userID, queryResult, sessionContextPath, projectId
         if(daysBetween(today,testDate)<result.rows[0].retest_days){ //if the test date is less than retest days
           let response = {
             fulfillmentText:"We can do a free retest for you. Our policy is any failed smog check completed within the last "+ result.rows[0].retest_days + ' days are eligible for a free retest so be sure to come in before then!',
-            userInfo:{
+            prevTest:{
               relativeLocation:relativeLocation,
               date:date,
               dateRange:dateRange,
@@ -620,7 +661,7 @@ async function handlePrevTest(userID, queryResult, sessionContextPath, projectId
         } else { //if the test date is more than retest days
           let response = {
             fulfillmentText:"Sorry, our free retest policy is the last test must be completed within "+ result.rows[0].retest_days + ' days. How else may I help?',
-            userInfo:{
+            prevTest:{
               relativeLocation:relativeLocation,
               date:date,
               dateRange:dateRange,
@@ -638,7 +679,7 @@ async function handlePrevTest(userID, queryResult, sessionContextPath, projectId
         if(daysBetween(today,startDay)<result.rows[0].retest_days){//the earlest date in the range is less than retest days
           let response = {
             fulfillmentText:"We can do a free retest for you. Our policy is any failed smog check completed within the last "+ result.rows[0].retest_days + ' days are eligible for a free retest so be sure to come in before then!',
-            userInfo:{
+            prevTest:{
               relativeLocation:relativeLocation,
               date:date,
               dateRange:dateRange,
@@ -652,7 +693,7 @@ async function handlePrevTest(userID, queryResult, sessionContextPath, projectId
         } else if(daysBetween(today,endDay)>result.rows[0].retest_days){ //the latest date in the range is more than retest days
           let response = {
             fulfillmentText:"Sorry, our free retest policy is the last test must be completed within "+ result.rows[0].retest_days + ' days. How else may I help?',
-            userInfo:{
+            prevTest:{
               relativeLocation:relativeLocation,
               date:date,
               dateRange:dateRange,
@@ -666,7 +707,7 @@ async function handlePrevTest(userID, queryResult, sessionContextPath, projectId
         } else { // the retest day is somewhere in the middle of the range
           let response = {
             fulfillmentText:"What is the exact date of your test? ",
-            userInfo:{
+            prevTest:{
               relativeLocation:relativeLocation,
               date:date,
               dateRange:dateRange,
@@ -707,7 +748,7 @@ async function handlePrevTest(userID, queryResult, sessionContextPath, projectId
     } else if (date==''&& dateRange==''){ //the only other else is date and daterange are all empty
       let response = {
         fulfillmentText:"What is the exact date of your test? ",
-        userInfo:{
+        prevTest:{
           relativeLocation:relativeLocation,
           date:date,
           dateRange:dateRange,
@@ -720,7 +761,7 @@ async function handlePrevTest(userID, queryResult, sessionContextPath, projectId
     } else {
       let response = {
         fulfillmentText:"Looks like you didn't get the last test done here. What can I help with today?",
-        userInfo:{
+        prevTest:{
           relativeLocation:relativeLocation,
           date:date,
           dateRange:dateRange,
@@ -748,20 +789,20 @@ async function handleRetestPolicy(userID, queryResult, sessionContextPath){
   if(result==undefined||result.rows.length==0){ //no info on business having retest
     let response = {
       fulfillmentText:"Sorry I don't know the policies regarding previous tests or visits please call. What else can I help with today?",
-      context:queryResult.outputContexts,
+      contexts:queryResult.outputContexts,
     }
     return(response)
   } else {
     if(result.rows[0].free_retest){
       let response = {
         fulfillmentText:"We offer free retest within "+result.rows[0].retest_days + " days of the original test",
-        context:queryResult.outputContexts,
+        contexts:queryResult.outputContexts,
       }
       return(response)
     } else {
       let response = {
         fulfillmentText:"Sorry we do not offer a free retest",
-        context:queryResult.outputContexts,
+        contexts:queryResult.outputContexts,
       }
       return(response)
     }
@@ -773,11 +814,20 @@ async function handleAppointments(userID, queryResult, sessionContextPath, proje
   var date = userInfo.appointment.date;
   var dateRange = userInfo.appointment.dateRange;
 
-  time = appointmentUpdateUserInfo(time, date, dateRange, queryResult.parameters.fields.time, queryResult.parameters.fields.date, queryResults.parameters.fields['date-period']).time;
-  date = appointmentUpdateUserInfo(time, date, dateRange, queryResult.parameters.fields.time, queryResult.parameters.fields.date, queryResults.parameters.fields['date-period']).date;
-  dateRange = appointmentUpdateUserInfo(time, date, dateRange, queryResult.parameters.fields.time, queryResult.parameters.fields.date, queryResults.parameters.fields['date-period']).dateRange;
+  time = appointmentUpdateUserInfo(time, date, dateRange, queryResult.parameters.fields.time, queryResult.parameters.fields.date, queryResult.parameters.fields['date-period']).time;
+  date = appointmentUpdateUserInfo(time, date, dateRange, queryResult.parameters.fields.time, queryResult.parameters.fields.date, queryResult.parameters.fields['date-period']).date;
+  dateRange = appointmentUpdateUserInfo(time, date, dateRange, queryResult.parameters.fields.time, queryResult.parameters.fields.date, queryResult.parameters.fields['date-period']).dateRange;
 
-
+  let response = {
+    fulfillmentText:"Appointment handling not done yet",
+    contexts:queryResult.outputContexts,
+    appointment:{
+      time:time,
+      date:date,
+      dateRange:dateRange,
+    },
+  }
+  return(response)
 }
 
 function resetContext(currentContext,handledContextNew){
@@ -817,7 +867,7 @@ function appointmentUpdateUserInfo(time, date, dateRange, newTime, newDate, newD
   if(newDate != undefined && newDate.stringValue !=''){
     date = newDate.stringValue;
   }
-  if(newDateRage != undefined && newDateRange.structValue != undefined){
+  if(newDateRange != undefined && newDateRange.structValue != undefined){
     dateRange = {startDate:newDateRange.structValue.fields.startDate.stringValue, endDate:newDateRange.structValue.fields.endDate.stringValue};
   }
   return{time:time, date:date, dateRange:dateRange}
