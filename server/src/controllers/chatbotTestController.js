@@ -265,16 +265,16 @@ async function handleRegularHour(userID, queryResult){
   console.log('In handle regular hour')
   log.info('In handle regular hour')
   var response1='';
-  const now = new Date();
+  let now = new Date();
 
   var client = new pg.Client({
     connectionString: databaseURL
   });
   await client.connect();
-  const result = await client.query('SELECT * FROM business_hours WHERE business_id = $1 ORDER BY day',[userID]);
+  let result = await client.query('SELECT * FROM business_hours WHERE business_id = $1 ORDER BY day',[userID]);
   await client.end()
-  const hoursJson = businessHoursHelper.toJsonHours(result).hoursJson;
-  const hoursText = businessHoursHelper.toJsonHours(result).hoursText;
+  let hoursJson = businessHoursHelper.toJsonHours(result).hoursJson;
+  let hoursText = businessHoursHelper.toJsonHours(result).hoursText;
 
   //first case is both day and time are obtained from the userUtterance
   if(queryResult.parameters.fields.date.stringValue!=="" &&queryResult.parameters.fields.time.stringValue!==""){
@@ -336,7 +336,7 @@ async function handleRegularHour(userID, queryResult){
   } else if(queryResult.parameters.fields['date-period'].structValue != undefined){
     console.log('in fourth case')
     let datePeriod = {startDate:new Date(queryResult.parameters.fields['date-period'].structValue.fields.startDate.stringValue), endDate:new Date(queryResult.parameters.fields['date-period'].structValue.fields.endDate.stringValue)}
-    dateArray = businessHoursHelper.getDatesBetween(datePeriod.startDate, datePeriod.endDate);
+    let dateArray = businessHoursHelper.getDatesBetween(datePeriod.startDate, datePeriod.endDate);
     if(dateArray.length<=7){
       let openDays = [];
       let closedDays = [];
@@ -810,6 +810,16 @@ async function handleRetestPolicy(userID, queryResult, sessionContextPath){
 }
 
 async function handleAppointments(userID, queryResult, sessionContextPath, projectId, credentialPath, sessionId, userInfo){
+
+  var client = new pg.Client({
+    connectionString: databaseURL
+  });
+  await client.connect();
+  const result = await client.query('SELECT * FROM business_hours WHERE business_id = $1 ORDER BY day',[userID]);
+  await client.end()
+  let hoursJson = businessHoursHelper.toJsonHours(result).hoursJson;
+  let hoursText = businessHoursHelper.toJsonHours(result).hoursText;
+
   var time = userInfo.appointment.time;
   var date = userInfo.appointment.date;
   var dateRange = userInfo.appointment.dateRange;
@@ -820,39 +830,157 @@ async function handleAppointments(userID, queryResult, sessionContextPath, proje
   dateRange = appointmentUpdateUserInfo(time, date, dateRange, queryResult.parameters.fields.time, queryResult.parameters.fields.date, queryResult.parameters.fields['date-period']).dateRange;
 
   if(time=='' && date ==''){
-    await createContext(projectId, credentialPath, sessionId, 'book-appointment-time');
-    response = {
-      fulfillmentText:'Which date and time would you like the reservation?',
-      context:queryResult.outputContexts,
-      appointment:{
-        time:time,
-        date:date,
-        dateRange:dateRange,
+    if(dateRange !=''){
+      await createContext(projectId, credentialPath, sessionId, 'book-appointment-time');
+      let datePeriod = {startDate:new Date(dateRange.startDate), endDate:new Date(dateRange.endDate)}
+      let dateArray = businessHoursHelper.getDatesBetween(datePeriod.startDate, datePeriod.endDate);
+      if(dateArray.length<=7){
+        let openDays = [];
+        let closedDays = [];
+        dateArray.map(date1=>{
+          var requestDay = date1.getDay()
+          var requestDayHours = businessHoursHelper.getRegularHoursOneDay(requestDay, hoursJson);
+          if (requestDayHours.closed){
+            closedDays.push(businessHoursHelper.integerToDay(requestDay))
+          }else {
+            openDays.push(businessHoursHelper.integerToDay(requestDay))
+          }
+        })
+        let openText
+        let closedText
+        if (openDays.length>0){
+          openText = 'We are open on ';
+          openDays.map((openDay, i)=>{
+            if(openDays.length== i+1){
+              openText = openText + openDay + '. '
+            } else {
+              openText = openText + openDay + ', '
+            }
+          });
+        }
+        if(closedDays.length>0){
+          closedText = 'We are closed on ';
+          closedDays.map((closedDay, i) =>{
+            if(closedDays.length == i+1 ){
+              closedText = closedText + closedDay + '. '
+            } else {
+              closedText = closedText + closedDay + ', '
+            }
+          });
+        }
+        if(openDays.length == dateArray.length){
+          response = {
+            fulfillmentText: 'Sure, which date and time would you like to book?',
+            context:queryResult.outputContexts,
+            appointment:{
+              time:time,
+              date:date,
+              dateRange:dateRange,
+            }
+          }
+        } else if (closedDays.length = dateArray.length){
+          response = {
+            fulfillmentText:'Sorry we are closed those days. Which other date and time works for you?',
+            context:queryResult.outputContexts,
+            appointment:{
+              time:time,
+              date:date,
+              dateRange:dateRange,
+            }
+          }
+        } else {
+          response = {
+            fulfillmentText: openText + closedText + 'which day would you like to book?',
+            context:queryResult.outputContexts,
+            appointment:{
+              time:time,
+              date:date,
+              dateRange:dateRange,
+            }
+          }
+        }
+      }
+    } else {
+      await createContext(projectId, credentialPath, sessionId, 'book-appointment-time');
+      response = {
+        fulfillmentText:'Which date and time would you like the reservation?',
+        context:queryResult.outputContexts,
+        appointment:{
+          time:time,
+          date:date,
+          dateRange:dateRange,
+        }
       }
     }
   } else if (time ==''){
+    let requestDay = new Date(date).getDay();
+    let requestDayHours = businessHoursHelper.getRegularHoursOneDay(requestDay, hoursJson);
+
     await createContext(projectId, credentialPath, sessionId, 'book-appointment-time');
-    response = {
-      fulfillmentText:'What time on would you like to book?',
-      context:queryResult.outputContexts,
-      appointment:{
-        time:time,
-        date:date,
-        dateRange:dateRange,
+
+    if(requestDayHours.closed){
+      response = {
+        fulfillmentText:'Sorry we are closed that day, which other date and time would work for you?',
+        context:queryResult.outputContexts,
+        appointment:{
+          time:time,
+          date:date,
+          dateRange:dateRange,
+        }
+      }
+    } else {
+      response = {
+        fulfillmentText:'What time on would you like to book?',
+        context:queryResult.outputContexts,
+        appointment:{
+          time:time,
+          date:date,
+          dateRange:dateRange,
+        }
       }
     }
   } else {
-    response = {
-      fulfillmentText:"Appointment handling not done yet",
-      contexts:queryResult.outputContexts,
-      appointment:{
-        time:time,
-        date:date,
-        dateRange:dateRange,
-      },
+    let requestTime = new Date(time)
+    let requestHour = requestTime.getHours();
+    let requestMinute = requestTime.getMinutes();
+    let requestDay = new Date(date).getDay();
+    let requestDayHours = businessHoursHelper.getRegularHoursOneDay(requestDay, hoursJson);
+    if(requestDayHours.closed){
+      await createContext(projectId, credentialPath, sessionId, 'book-appointment-time');
+      response = {
+        fulfillmentText:'Sorry we are closed that day, which other date and time would work for you?',
+        context:queryResult.outputContexts,
+        appointment:{
+          time:time,
+          date:date,
+          dateRange:dateRange,
+        }
+      }
+    } else {
+      let appointments = await googleCalendar.listAppointmentAt(time, 30);
+      if(appointments.length == 0){
+        response = {
+          fulfillmentText:"Great, would you like to book " + requestHour + ':'+ requestMinute + ' on ' + businessHoursHelper.integerToDay(requestDay),
+          contexts:queryResult.outputContexts,
+          appointment:{
+            time:time,
+            date:date,
+            dateRange:dateRange,
+          },
+        }
+      } else {
+        response = {
+          fulfillmentText:"Sorry looks like there is an appointment already at " + requestHour + ':'+ requestMinute + ' on ' + businessHoursHelper.integerToDay(requestDay),
+          contexts:queryResult.outputContexts,
+          appointment:{
+            time:time,
+            date:date,
+            dateRange:dateRange,
+          },
+        }
+      }
     }
   }
-
   return(response)
 }
 

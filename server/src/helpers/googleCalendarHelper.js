@@ -40,39 +40,64 @@ jwtClient.authorize(function (err, tokens) {
 
 function listCurrentAppointments(hours){
   let calendar = google.calendar('v3');
-  calendar.events.list({
-    auth: jwtClient,
-    calendarId: 'aq3f1u8tj72ereh2b3ga3qsqao@group.calendar.google.com',
-    timeMin: (new Date()).toISOString,
-    timeMax: (new Date() + hours*60*60*1000).toISOString
-  }, function (err, response) {
-      if (err) {
-        console.log('The API returned an error: ' + err);
-        return('The API returned an error: ' + err);
-      }
-      var events = response.data.items;
-      return(events);
-  });
-}
 
-function listAppointmentAt(dateTime, interval){
-  let calendar = google.calendar('v3');
-  calendar.events.list({
-    auth: jwtClient,
-    calendarId:'aq3f1u8tj72ereh2b3ga3qsqao@group.calendar.google.com',
-    timeMin:(new Date(dateTime)).toISOString,
-    timeMax:(new Date(dateTime)+interval*60*1000).toISOString,
-  }, function(err, response){
-    if (err){
-      console.log('The API returned an error: ' + err);
-      return('The API returned an error: ' + err);
-    }
-    var events = response.data.items;
-    return(events)
+  return new Promise(function(resolve,reject){
+    calendar.events.list({
+      auth: jwtClient,
+      calendarId: 'aq3f1u8tj72ereh2b3ga3qsqao@group.calendar.google.com',
+      timeMin: (new Date()).toISOString,
+      timeMax: (new Date() + hours*60*60*1000).toISOString
+    }, function (err, response) {
+        if (err) {
+          console.log('The API returned an error: ' + err);
+          reject('The API returned an error: ' + err);
+        }
+        var events = response.data.items;
+        events.map((event, i) => {
+          const start = event.start.dateTime || event.start.date;
+          console.log(`${start} - ${event.summary}`);
+        });
+        resolve(events);
+    });
   })
 }
 
-function insertAppointment(event){
+function listAppointmentAt(dateTime, interval){
+
+  console.log('in listAppointmentAt')
+  let events
+  let calendar = google.calendar('v3');
+
+  let startTime = new Date(dateTime).toISOString();
+  let endTime = addMinutes(startTime, interval)
+
+  return new Promise(function(resolve,reject){
+    calendar.events.list({
+      auth: jwtClient,
+      calendarId:'aq3f1u8tj72ereh2b3ga3qsqao@group.calendar.google.com',
+      timeMin:startTime,
+      timeMax:endTime,
+    }, function(err, response){
+      if (err){
+        console.log('The API returned an error: ' + err);
+        reject('The API returned an error: ' + err);
+      }
+      console.log('no problems')
+      events = response.data.items;
+      if(events.length!=0){
+        events.map((event, i) => {
+            const start = event.start.dateTime || event.start.date;
+            console.log(`${start} - ${event.summary}`);
+          });
+      } else {
+        console.log('no events found')
+      }
+      resolve(events)
+    })
+  })
+}
+
+function insertAppointment(event1){
   let calendar = google.calendar('v3');
   calendar.events.insert({
     auth: jwtClient,
@@ -83,6 +108,14 @@ function insertAppointment(event){
       console.log('The API returned an error: ' + err);
       return('The API returned an error: ' + err);
     }
-    console.log('Event created: %j', event)
+    console.log('Event created: %j', event1)
   })
+}
+
+function addMinutes(dateTime, minutes){
+  let time = new Date(dateTime)
+  console.log(time)
+  let endTime = new Date(time.getTime()+minutes*60*1000)
+  console.log(endTime)
+  return(endTime);
 }
