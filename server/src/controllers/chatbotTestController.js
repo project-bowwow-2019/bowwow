@@ -139,7 +139,7 @@ async function findResponse(req, res, next){
   } else if (intentName == 'retestPolicy'){
     const response4 = await handleRetestPolicy(req.body.userID, detectedResult, sessionContextPath)
     res.json(response4);
-  } else if (contextContains(outputContexts, sessionPath, 'book-appointment') && intentName.includes('appointments')){
+  } else if (contextContains(outputContexts, sessionContextPath, 'book-appointment') && intentName.includes('appointments')){
     const response5 = await handleAppointments(req.body.userID, detectedResult, sessionContextPath, req.body.dialogflowProjectId, req.body.dialogflowCredentialPath, req.body.sessionID, req.body.userInfo)
   }
   else {
@@ -329,7 +329,11 @@ async function handleRegularHour(userID, queryResult){
   } else if(queryResult.parameters.fields['date-period'].structValue != undefined){
     let datePeriod = {startDate:new Date(queryResult.parameters.fields['date-period'].structValue.fields.startDate.stringValue), endDate:new Date(queryResult.parameters.fields['date-period'].structValue.fields.endDate.stringValue)}
     dateArray = businessHoursHelper.getDatesBetween(datePeriod.startDate, datePeriod.endDate);
-    
+    let openDays = [];
+    let closedDays = [];
+    for(i=0;i<dateArray.length;i++){
+
+    }
   } else{
     response1 = {fulfillmentText: 'Our regular hours are: \n' + hoursText}
   }

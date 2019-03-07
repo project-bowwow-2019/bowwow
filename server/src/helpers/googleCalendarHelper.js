@@ -51,8 +51,7 @@ function listCurrentAppointments(hours){
         return('The API returned an error: ' + err);
       }
       var events = response.data.items;
-      return(events)
-    }
+      return(events);
   });
 }
 
@@ -73,7 +72,7 @@ function listAppointmentAt(dateTime, interval){
   })
 }
 
-function insertAppointmentAt(event){
+function insertAppointment(event){
   let calendar = google.calendar('v3');
   calendar.events.insert({
     auth: jwtClient,

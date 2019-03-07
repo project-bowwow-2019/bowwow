@@ -202,9 +202,11 @@ function GoodFriday(Y) {  // calculates Easter Sunday and subtracts 2 days
 function getDatesBetween(startDate, stopDate) {
     var dateArray = new Array();
     var currentDate = startDate;
+    var tempDate=currentDate;
     while (currentDate <= stopDate) {
         dateArray.push(new Date (currentDate));
-        currentDate = currentDate.addDays(1);
+        tempDate = currentDate.getDate()+1;
+        currentDate.setDate(tempDate);
     }
     return dateArray;
 }
