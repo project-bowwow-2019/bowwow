@@ -142,6 +142,9 @@ async function findResponse(req, res, next){
   } else if (contextContains(outputContexts, sessionContextPath, 'book-appointment') && intentName.includes('appointments')){
     const response5 = await handleAppointments(req.body.userID, detectedResult, sessionContextPath, req.body.dialogflowProjectId, req.body.dialogflowCredentialPath, req.body.sessionID, req.body.userInfo)
     res.json(response5);
+  } else if (contextContains(outputContexts, sessionContextPath, 'car-make') && intentName.includes('car-make')){
+    const response6 = await handleCar(req.body.userID, detectedResult, sessionContextPath, req.body.dialogflowProjectId, req.body.dialogflowCredentialPath, req.body.sessionID, req.body.userInfo);
+    res.json(response6);
   }
   else {
     res.json(detectedResult)
@@ -174,7 +177,7 @@ async function detectIntent(projectId, filePath, sessionId, question, contexts, 
   const responses = await sessionClient.detectIntent(request);
   console.log('Detected Intent');
   const result = responses[0].queryResult;
-  console.log(result)
+  console.log("%j",result)
   if(result.intent){
     console.log(` Intent: ${result.intent.displayName}`)
   } else {
@@ -820,21 +823,21 @@ async function handleAppointments(userID, queryResult, sessionContextPath, proje
   let hoursJson = businessHoursHelper.toJsonHours(result).hoursJson;
   let hoursText = businessHoursHelper.toJsonHours(result).hoursText;
 
-  var time = userInfo.appointment.time;
-  var date = userInfo.appointment.date;
-  var dateRange = userInfo.appointment.dateRange;
+  let time = userInfo.appointment.time;
+  let date = userInfo.appointment.date;
+  let dateRange = userInfo.appointment.dateRange;
   let response;
 
   time = appointmentUpdateUserInfo(time, date, dateRange, queryResult.parameters.fields.time, queryResult.parameters.fields.date, queryResult.parameters.fields['date-period']).time;
   date = appointmentUpdateUserInfo(time, date, dateRange, queryResult.parameters.fields.time, queryResult.parameters.fields.date, queryResult.parameters.fields['date-period']).date;
   dateRange = appointmentUpdateUserInfo(time, date, dateRange, queryResult.parameters.fields.time, queryResult.parameters.fields.date, queryResult.parameters.fields['date-period']).dateRange;
 
-  if(time=='' && date ==''){
-    if(dateRange !=''){
+  if(time=='' && date ==''){ // if no specifc time or date obtained from the utterance
+    if(dateRange !=''){ // if a range of dates is obtained from the utterance
       await createContext(projectId, credentialPath, sessionId, 'book-appointment-time');
       let datePeriod = {startDate:new Date(dateRange.startDate), endDate:new Date(dateRange.endDate)}
       let dateArray = businessHoursHelper.getDatesBetween(datePeriod.startDate, datePeriod.endDate);
-      if(dateArray.length<=7){
+      if(dateArray.length<=7){ // check if the number of dates less than 7.
         let openDays = [];
         let closedDays = [];
         dateArray.map(date1=>{
@@ -868,7 +871,7 @@ async function handleAppointments(userID, queryResult, sessionContextPath, proje
             }
           });
         }
-        if(openDays.length == dateArray.length){
+        if(openDays.length == dateArray.length){// if all days of the request are open
           response = {
             fulfillmentText: 'Sure, which date and time would you like to book?',
             context:queryResult.outputContexts,
@@ -878,7 +881,7 @@ async function handleAppointments(userID, queryResult, sessionContextPath, proje
               dateRange:dateRange,
             }
           }
-        } else if (closedDays.length = dateArray.length){
+        } else if (closedDays.length = dateArray.length){// if none of the days of the request is open
           response = {
             fulfillmentText:'Sorry we are closed those days. Which other date and time works for you?',
             context:queryResult.outputContexts,
@@ -888,7 +891,7 @@ async function handleAppointments(userID, queryResult, sessionContextPath, proje
               dateRange:dateRange,
             }
           }
-        } else {
+        } else { //if only some of the days of the request is open. specify which days are open and ask which day for booking
           response = {
             fulfillmentText: openText + closedText + 'which day would you like to book?',
             context:queryResult.outputContexts,
@@ -900,7 +903,7 @@ async function handleAppointments(userID, queryResult, sessionContextPath, proje
           }
         }
       }
-    } else {
+    } else {// if nothing regarding dates have been obtained.
       await createContext(projectId, credentialPath, sessionId, 'book-appointment-time');
       response = {
         fulfillmentText:'Which date and time would you like the reservation?',
@@ -912,13 +915,13 @@ async function handleAppointments(userID, queryResult, sessionContextPath, proje
         }
       }
     }
-  } else if (time ==''){
+  } else if (time ==''){ // if date is obtained but no time
     let requestDay = new Date(date).getDay();
     let requestDayHours = businessHoursHelper.getRegularHoursOneDay(requestDay, hoursJson);
 
     await createContext(projectId, credentialPath, sessionId, 'book-appointment-time');
 
-    if(requestDayHours.closed){
+    if(requestDayHours.closed){ //if the day of the request is closed
       response = {
         fulfillmentText:'Sorry we are closed that day, which other date and time would work for you?',
         context:queryResult.outputContexts,
@@ -928,9 +931,9 @@ async function handleAppointments(userID, queryResult, sessionContextPath, proje
           dateRange:dateRange,
         }
       }
-    } else {
+    } else { //if the day of the request is open
       response = {
-        fulfillmentText:'What time on would you like to book?',
+        fulfillmentText:'What time on '+businessHoursHelper.integerToDay(requestDay)+' would you like to book?',
         context:queryResult.outputContexts,
         appointment:{
           time:time,
@@ -939,13 +942,18 @@ async function handleAppointments(userID, queryResult, sessionContextPath, proje
         }
       }
     }
-  } else {
+  } else { //if time is obtained. Date might not necessarily be obtained yet
     let requestTime = new Date(time)
     let requestHour = requestTime.getHours();
     let requestMinute = requestTime.getMinutes();
-    let requestDay = new Date(date).getDay();
+    let requestDay
+    if (date != ''){
+      requestDay = new Date(date).getDay();
+    } else {
+      requestDay = requestTime.getDay();
+    }
     let requestDayHours = businessHoursHelper.getRegularHoursOneDay(requestDay, hoursJson);
-    if(requestDayHours.closed){
+    if(requestDayHours.closed){ //if the date requested is closed
       await createContext(projectId, credentialPath, sessionId, 'book-appointment-time');
       response = {
         fulfillmentText:'Sorry we are closed that day, which other date and time would work for you?',
@@ -956,19 +964,47 @@ async function handleAppointments(userID, queryResult, sessionContextPath, proje
           dateRange:dateRange,
         }
       }
-    } else {
+    } else { // if the date is open
       let appointments = await googleCalendar.listAppointmentAt(time, 30);
-      if(appointments.length == 0){
-        response = {
-          fulfillmentText:"Great, would you like to book " + requestHour + ':'+ requestMinute + ' on ' + businessHoursHelper.integerToDay(requestDay),
-          contexts:queryResult.outputContexts,
-          appointment:{
-            time:time,
-            date:date,
-            dateRange:dateRange,
-          },
+      if(appointments.length == 0){ //if there is no appointment at the requested time
+        //need to check if the car information is received.
+        if(userInfo.car.year !='' && (userInfo.car.type!='' || userInfo.car.utterance!='' || userInfo.car.model!='')){ //if car info is available
+          userInfo.appointment.time = time;
+          userInfo.appointment.date = date;
+          userInfo.appointment.dateRange = dateRange;
+          googleCalendar.insertAppointment(userInfo)
+          response={
+            fulfillmentText:"Great, you are booked for " + requestHour + ':'+ requestMinute + ' on ' + businessHoursHelper.integerToDay(requestDay),
+            context:queryResult.outputContexts,
+            appointment:{
+              time:time,
+              date:date,
+              dateRange:dateRange,
+            }
+          }
+        } else if (userInfo.car.year=='' && (userInfo.car.type!='' || userInfo.car.utterance!='' || userInfo.car.model!='')){//if car info is available but just the year isn't
+          await createContext(projectId, credentialPath, sessionId, 'car-make-year')
+          response = {
+            fulfillmentText: 'What year is your car?',
+            context:queryResult.outputContexts,
+            appointment:{
+              time:time,
+              date:date,
+              dateRange:dateRange,
+            }
+          }
+        } else { //if no car info available at all.
+          response = {
+            fulfillmentText:'Can you let us know what type of car you have and what year is it?',
+            contexts:queryResult.outputContexts,
+            appointment:{
+              time:time,
+              date:date,
+              dateRange:dateRange,
+            },
+          }
         }
-      } else {
+      } else { // if there is an appointment already
         response = {
           fulfillmentText:"Sorry looks like there is an appointment already at " + requestHour + ':'+ requestMinute + ' on ' + businessHoursHelper.integerToDay(requestDay),
           contexts:queryResult.outputContexts,
@@ -981,6 +1017,60 @@ async function handleAppointments(userID, queryResult, sessionContextPath, proje
       }
     }
   }
+  return(response)
+}
+
+async function handleCar(userID, queryResult, sessionContextPath, projectId, credentialPath, sessionId, userInfo){
+  let type = userInfo.car.type;
+  let model = userInfo.car.model;
+  let year = userInfo.car.year;
+  let utterance = userInfo.car.utterance;
+  let response;
+
+  type = carUpdateUserInfo(type, model, year, utterance, queryResult.parameters.fields.carType, queryResult.parameters.fields.carMake, queryResult.parameters.fields.number, queryResult.parameters.queryText).type;
+  model = carUpdateUserInfo(type, model, year, utterance, queryResult.parameters.fields.carType, queryResult.parameters.fields.carMake, queryResult.parameters.fields.number, queryResult.parameters.queryText).model;
+  year = carUpdateUserInfo(type, model, year, utterance, queryResult.parameters.fields.carType, queryResult.parameters.fields.carMake, queryResult.parameters.fields.number, queryResult.parameters.queryText).year;
+  utterance = carUpdateUserInfo(type, model, year, utterance, queryResult.parameters.fields.carType, queryResult.parameters.fields.carMake, queryResult.parameters.fields.number, queryResult.parameters.queryText).utterance;
+
+  if(year==''){
+    await createContext(projectId, credentialPath, sessionId, 'car-make-year');
+    response={
+      fulfillmentText:'What year is your vehicle?',
+      context:queryResult.outputContexts,
+      car:{
+        type:type,
+        model:model,
+        year:year,
+        utterance:utterance,
+      }
+    }
+  } else if(userInfo.appointment.time!=''){
+    await deleteContext(projectId, credentialPath, sessionId, 'car-make');
+    await deleteContext(projectId, credentialPath, sessionId, 'book-appointment');
+    googleCalendar.insertAppointment(userInfo);
+    response={
+      fulfillmentText:"Great, you are all booked",
+      context:queryResult.outputContexts,
+      car:{
+        type:type,
+        model:model,
+        year:year,
+        utterance:utterance,
+      }
+    }
+  } else {
+    response={
+      fulfillmentText:"Thanks, how can I help?",
+      context:queryResult.outputContexts,
+      car:{
+        type:type,
+        model:model,
+        year:year,
+        utterance:utterance,
+      }
+    }
+  }
+
   return(response)
 }
 
@@ -1025,6 +1115,22 @@ function appointmentUpdateUserInfo(time, date, dateRange, newTime, newDate, newD
     dateRange = {startDate:newDateRange.structValue.fields.startDate.stringValue, endDate:newDateRange.structValue.fields.endDate.stringValue};
   }
   return{time:time, date:date, dateRange:dateRange}
+}
+
+function carUpdateUserInfo(type, model, year, utterance, newType, newModel, newYear, newUtterance){
+  if(newType != undefined && newType.stringValue !=''){
+    type = newType.stringValue;
+  }
+  if(newModel != undefined && newModel.stringValue !=''){
+    model = newModel.stringValue;
+  }
+  if(newYear != undefined && newYear.stringValue !=''){
+    year = newYear.numberValue;
+  }
+  if((newType == undefined || newType.stringValue =='') && (newModel == undefined || newModel.stringValue =='')){
+    utterance=newUtterance;
+  }
+  return{type:type, model:model, year:year, utterance:utterance}
 }
 
 function contextContains(contexts, contextSessionPath, contextId){

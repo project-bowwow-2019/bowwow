@@ -28,6 +28,11 @@ function getRegularHoursOneDay(day, hours){
   }
 }
 
+//helper function to check if the requested time the business is open
+function checkOpenTime(time, hours){
+  
+}
+
 //helper function to turn the queried rows from database to a json format and a text format
 function toJsonHours(hours){
   var hoursJson={}

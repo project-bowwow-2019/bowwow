@@ -97,12 +97,32 @@ function listAppointmentAt(dateTime, interval){
   })
 }
 
-function insertAppointment(event1){
+function insertAppointment(info){
+  let startTime
+  if(info.appointment.date!=''){
+    startTime = info.appointment.date.substring(0,10) + info.appointment.time.substring(10)
+  } else {
+    startTime = info.appointment.time
+  }
+  console.log(startTime)
+  let endTime = addMinutes(startTime,30);
+  let summary= 'Smog Check for' + info.name;
+  let description = 'Car Type: ' + info.car.type + ' Model: '+ info.car.model + ' Year: ' + info.car.year + ' Utterance: ' + info.car.utterance
+  let event1 = {
+    'summary':summary,
+    'description':description,
+    'start':{
+      'dateTime':startTime,
+    },
+    'end':{
+      'dateTime':endTime,
+    }
+  }
   let calendar = google.calendar('v3');
   calendar.events.insert({
     auth: jwtClient,
     calendarId:'aq3f1u8tj72ereh2b3ga3qsqao@group.calendar.google.com',
-    resource: event,
+    resource: event1,
   }, function(err, response){
     if (err){
       console.log('The API returned an error: ' + err);
