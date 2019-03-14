@@ -297,7 +297,7 @@ async function handleRegularHour(userID, queryResult){
     if(requestDayHours.closed){
       response1 = {fulfillmentText:'Sorry we are closed on ' + businessHoursHelper.integerToDay(requestDay)};
     } else if ((requestHour+requestMinute/60)<(closingHour+closingMinute/60) && (requestHour+requestMinute/60)>(openingHour+openingMinute/60)){
-      response1 = {fulfillmentText:'Yes we are open at '+ requestHour + ":" + requestMinute + ' on ' + businessHoursHelper.integerToDay(requestDay)}
+      response1 = {fulfillmentText:'We are open at '+ requestHour + ":" + requestMinute + ' on ' + businessHoursHelper.integerToDay(requestDay)}
     } else {
       response1 = {fulfillmentText: 'Sorry we are closed at ' + requestHour + ":" + requestMinute + ' on ' + businessHoursHelper.integerToDay(requestDay)}
     }
@@ -311,7 +311,7 @@ async function handleRegularHour(userID, queryResult){
     if (requestDayHours.closed){
       response1 = {fulfillmentText: 'Sorry we are closed on ' + businessHoursHelper.integerToDay(requestDay)};
     } else {
-      response1 = {fulfillmentText:'Yes we are open on ' + businessHoursHelper.integerToDay(requestDay) + '. Our regular hours are ' + requestDayHours.opens[0] + ' to ' + requestDayHours.closes[0] + ' on ' + businessHoursHelper.integerToDay(requestDay)}
+      response1 = {fulfillmentText:'We are open on ' + businessHoursHelper.integerToDay(requestDay) + '. Our regular hours are ' + requestDayHours.opens[0] + ' to ' + requestDayHours.closes[0] + ' on ' + businessHoursHelper.integerToDay(requestDay)}
     }
 
   } else if(queryResult.parameters.fields.date.stringValue==="" && queryResult.parameters.fields.time.stringValue !== ""){ //third case is if only time is obtained
@@ -892,6 +892,7 @@ async function handleAppointments(userID, queryResult, sessionContextPath, proje
             }
           }
         } else { //if only some of the days of the request is open. specify which days are open and ask which day for booking
+          await createContext(projectId, credentialPath, sessionId, 'book-appointment-time')
           response = {
             fulfillmentText: openText + closedText + 'which day would you like to book?',
             context:queryResult.outputContexts,
@@ -932,6 +933,7 @@ async function handleAppointments(userID, queryResult, sessionContextPath, proje
         }
       }
     } else { //if the day of the request is open
+      await createContext(projectId, credentialPath, sessionId, 'book-appointment-time')
       response = {
         fulfillmentText:'What time on '+businessHoursHelper.integerToDay(requestDay)+' would you like to book?',
         context:queryResult.outputContexts,
@@ -946,6 +948,7 @@ async function handleAppointments(userID, queryResult, sessionContextPath, proje
     let requestTime = new Date(time)
     let requestHour = requestTime.getHours();
     let requestMinute = requestTime.getMinutes();
+    let requestTimeString = businessHoursHelper.colloquializeTime(requestHour, requestMinute);
     let requestDay
     if (date != ''){
       requestDay = new Date(date).getDay();
@@ -965,37 +968,51 @@ async function handleAppointments(userID, queryResult, sessionContextPath, proje
         }
       }
     } else { // if the date is open
-      let appointments = await googleCalendar.listAppointmentAt(time, 30);
-      if(appointments.length == 0){ //if there is no appointment at the requested time
-        //need to check if the car information is received.
-        if(userInfo.car.year !='' && (userInfo.car.type!='' || userInfo.car.utterance!='' || userInfo.car.model!='')){ //if car info is available
-          userInfo.appointment.time = time;
-          userInfo.appointment.date = date;
-          userInfo.appointment.dateRange = dateRange;
-          googleCalendar.insertAppointment(userInfo)
-          response={
-            fulfillmentText:"Great, you are booked for " + requestHour + ':'+ requestMinute + ' on ' + businessHoursHelper.integerToDay(requestDay),
-            context:queryResult.outputContexts,
-            appointment:{
-              time:time,
-              date:date,
-              dateRange:dateRange,
+      if(businessHoursHelper.checkOpen(requestHour, requestMinute, requestDayHours)){
+        let appointments = await googleCalendar.listAppointmentAt(time, 30);
+        if(appointments.length == 0){ //if there is no appointment at the requested time
+          //need to check if the car information is received.
+          if(userInfo.car.year !='' && (userInfo.car.type!='' || userInfo.car.utterance!='' || userInfo.car.model!='')){ //if car info is available
+            userInfo.appointment.time = time;
+            userInfo.appointment.date = date;
+            userInfo.appointment.dateRange = dateRange;
+            googleCalendar.insertAppointment(userInfo)
+            await deleteContext (projectId, credentialPath, sessionId, 'book-appointment')
+            response={
+              fulfillmentText:"Great, you are booked for " + requestTimeString + ' on ' + businessHoursHelper.integerToDay(requestDay),
+              context:queryResult.outputContexts,
+              appointment:{
+                time:time,
+                date:date,
+                dateRange:dateRange,
+              }
+            }
+          } else if (userInfo.car.year=='' && (userInfo.car.type!='' || userInfo.car.utterance!='' || userInfo.car.model!='')){//if car info is available but just the year isn't
+            await createContext(projectId, credentialPath, sessionId, 'car-make-year')
+            response = {
+              fulfillmentText: 'What year is your car?',
+              context:queryResult.outputContexts,
+              appointment:{
+                time:time,
+                date:date,
+                dateRange:dateRange,
+              }
+            }
+          } else { //if no car info available at all.
+            response = {
+              fulfillmentText:'Can you let us know what type of car you have and what year is it?',
+              contexts:queryResult.outputContexts,
+              appointment:{
+                time:time,
+                date:date,
+                dateRange:dateRange,
+              },
             }
           }
-        } else if (userInfo.car.year=='' && (userInfo.car.type!='' || userInfo.car.utterance!='' || userInfo.car.model!='')){//if car info is available but just the year isn't
-          await createContext(projectId, credentialPath, sessionId, 'car-make-year')
+        } else { // if there is an appointment already
+          await createContext(projectId, credentialPath, sessionId, 'book-appointment-time')
           response = {
-            fulfillmentText: 'What year is your car?',
-            context:queryResult.outputContexts,
-            appointment:{
-              time:time,
-              date:date,
-              dateRange:dateRange,
-            }
-          }
-        } else { //if no car info available at all.
-          response = {
-            fulfillmentText:'Can you let us know what type of car you have and what year is it?',
+            fulfillmentText:"Sorry looks like there is an appointment already at " + requestTimeString + ' on ' + businessHoursHelper.integerToDay(requestDay),
             contexts:queryResult.outputContexts,
             appointment:{
               time:time,
@@ -1004,15 +1021,16 @@ async function handleAppointments(userID, queryResult, sessionContextPath, proje
             },
           }
         }
-      } else { // if there is an appointment already
+      } else {
+        await createContext(projectId, credentialPath, sessionId, 'book-appointment-time')
         response = {
-          fulfillmentText:"Sorry looks like there is an appointment already at " + requestHour + ':'+ requestMinute + ' on ' + businessHoursHelper.integerToDay(requestDay),
-          contexts:queryResult.outputContexts,
+          fulfillmentText:'Sorry we are closed at '+requestTimeString + '. Our hours are ' + requestDayHours.opens[0] + ' to ' + requestDayHours.closes[0] + ' on ' + businessHoursHelper.integerToDay(requestDay) + '. What other times are you available?',
+          contexts:queryResult.outputContext,
           appointment:{
             time:time,
             date:date,
             dateRange:dateRange,
-          },
+          }
         }
       }
     }

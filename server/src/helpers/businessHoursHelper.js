@@ -5,6 +5,8 @@ module.exports={
   integerToDay,
   checkHoliday,
   getDatesBetween,
+  checkOpen,
+  colloquializeTime,
 }
 
 //function to get the open and close hours of a particular day in regular hour handling. The input is integer 0-6 per javascript Date().getDay() method
@@ -29,8 +31,21 @@ function getRegularHoursOneDay(day, hours){
 }
 
 //helper function to check if the requested time the business is open
-function checkOpenTime(time, hours){
-  
+function checkOpen(requestHour, requestMinute, businessHours){
+  const openingHour = parseInt(businessHours.opens[0].substring(0,2),10);
+  const openingMinute = parseInt(businessHours.opens[0].substring(3,5),10)
+  const closingHour = parseInt(businessHours.closes[0].substring(0,2),10);
+  const closingMinute = parseInt(businessHours.closes[0].substring(3,5),10);
+
+  console.log(openingHour)
+  console.log(closingHour)
+  console.log(requestHour)
+
+  if((requestHour+requestMinute/60)>=(closingHour+closingMinute/60) || (requestHour+requestMinute/60)<(openingHour+openingMinute/60)){
+    return false;
+  } else {
+    return true;
+  }
 }
 
 //helper function to turn the queried rows from database to a json format and a text format
@@ -204,6 +219,7 @@ function GoodFriday(Y) {  // calculates Easter Sunday and subtracts 2 days
     return parseInt(M, 10) + '/' + parseInt(D, 10);  // return without any leading zeros
 }
 
+// get all the dates in between 2 dates. The 2 dates are included.
 function getDatesBetween(startDate, stopDate) {
     var dateArray = new Array();
     var currentDate = startDate;
@@ -214,4 +230,24 @@ function getDatesBetween(startDate, stopDate) {
         currentDate.setDate(tempDate);
     }
     return dateArray;
+}
+
+//colloquialize the time with given hour and minute
+function colloquializeTime(requestHour, requestMinute){
+  let newMinute
+  let newHour
+  let returnString
+  if(requestMinute<10){
+    newMinute = '0'+requestMinute;
+  } else {
+    newMinute = requestMinute;
+  }
+  if (requestHour>12){
+    newHour = requestHour-12;
+    returnString = newHour + ':' + newMinute + ' pm'
+  } else {
+    newHour = requestHour;
+    returnString = newHour + ':' + newMinute + ' am'
+  }
+  return(returnString)
 }
