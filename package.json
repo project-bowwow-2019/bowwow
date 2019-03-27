@@ -37,6 +37,7 @@
     "prop-types": "^15.7.1",
     "react": "latest",
     "react-chat-popup": "^1.1.2",
+    "react-chat-widget": "^2.1.4-1",
     "react-dom": "latest",
     "react-jss": "^8.6.1",
     "react-no-ssr": "^1.1.0",
