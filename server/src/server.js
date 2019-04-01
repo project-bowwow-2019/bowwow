@@ -9,6 +9,7 @@ const livecheck = require('./routes/livecheck')
 const chatbot = require('./routes/chatbot');
 const chatbotCreate = require('./routes/chatbotCreate')
 const chatbotTest = require('./routes/chatbotTest')
+const cors = require('cors')
 
 const dev = process.env.NODE_ENV !== 'production'
 const nextApp = next({ dev })
@@ -28,6 +29,8 @@ function createServer(){
     });
 
     const app = express();
+
+    app.use(cors())
 
     app.use(bodyParser.json());
     app.use(bodyParser.urlencoded({ extended: true }));
